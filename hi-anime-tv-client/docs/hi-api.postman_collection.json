@@ -1,0 +1,194 @@
+{
+  "info": {
+    "_postman_id": "5e8a3200-1b1e-4e51-9b5b-1e731a9d2fa0",
+    "name": "Hi Anime API",
+    "description": "Postman collection generated from hi-api-docus.md. Replace the sample slug and anime ID with values for your requests.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Home",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/home?slugNth={{slugNth}}&includeSlugs={{includeSlugs}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "home"
+          ],
+          "query": [
+            {
+              "key": "slugNth",
+              "value": "{{slugNth}}"
+            },
+            {
+              "key": "includeSlugs",
+              "value": "{{includeSlugs}}"
+            }
+          ]
+        },
+        "description": "Fetches the home page collections and latest episodes."
+      },
+      "response": []
+    },
+    {
+      "name": "Get Anime by Slug",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/anime/{{animeSlug}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "anime",
+            "{{animeSlug}}"
+          ]
+        },
+        "description": "Fetches anime details and episode data for the specified slug."
+      },
+      "response": []
+    },
+    {
+      "name": "Search Anime",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"{{searchTitle}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/search",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "search"
+          ]
+        },
+        "description": "Searches anime by title."
+      },
+      "response": []
+    },
+    {
+      "name": "Get Latest Anime",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/anime?limit={{limit}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "anime"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "{{limit}}"
+            }
+          ]
+        },
+        "description": "Fetches the latest anime. The documented example uses a limit of 12."
+      },
+      "response": []
+    },
+    {
+      "name": "Get Episodes by Anime ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/episodes/{{animeId}}?start={{start}}&end={{end}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "episodes",
+            "{{animeId}}"
+          ],
+          "query": [
+            {
+              "key": "start",
+              "value": "{{start}}"
+            },
+            {
+              "key": "end",
+              "value": "{{end}}"
+            }
+          ]
+        },
+        "description": "Fetches episodes in the requested start/end range for an anime ID."
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://animehot.cc",
+      "type": "string"
+    },
+    {
+      "key": "slugNth",
+      "value": "10",
+      "type": "string"
+    },
+    {
+      "key": "includeSlugs",
+      "value": "false",
+      "type": "string"
+    },
+    {
+      "key": "animeSlug",
+      "value": "the-laid-off-cheat-granting-mage-enjoys-a-second-lease-on-life-qalswb",
+      "type": "string"
+    },
+    {
+      "key": "searchTitle",
+      "value": "dr stone",
+      "type": "string"
+    },
+    {
+      "key": "limit",
+      "value": "12",
+      "type": "string"
+    },
+    {
+      "key": "animeId",
+      "value": "6ac121ed084af4f873a70b4f",
+      "type": "string"
+    },
+    {
+      "key": "start",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "end",
+      "value": "6",
+      "type": "string"
+    }
+  ]
+}
