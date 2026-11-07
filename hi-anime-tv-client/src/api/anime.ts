@@ -2,6 +2,19 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const DEFAULT_API_BASE_URL = 'https://animehot.cc/api';
 const API_BASE_URL_KEY = 'hianime.apiBaseUrl';
+const LAST_WATCHED_KEY = 'hianime.lastWatched';
+
+export type LastWatched = {
+  animeId: string;
+  animeSlug: string;
+  title: string;
+  image?: string;
+  episode: string;
+  episodeIndex: number;
+  totalEpisodes: number;
+  language: StreamLanguage;
+  updatedAt: number;
+};
 
 export function normalizeApiBaseUrl(value: string): string {
   const trimmed = value.trim().replace(/\/+$/, '');
@@ -38,6 +51,58 @@ export async function saveApiBaseUrl(value: string): Promise<string> {
   return normalizedUrl;
 }
 
+export async function getLastWatched(): Promise<LastWatched | null> {
+  const savedValue = await AsyncStorage.getItem(LAST_WATCHED_KEY);
+  if (!savedValue) return null;
+
+  try {
+    const saved = JSON.parse(savedValue) as Partial<LastWatched>;
+    if (
+      typeof saved.animeId !== 'string' ||
+      typeof saved.animeSlug !== 'string' ||
+      typeof saved.title !== 'string' ||
+      typeof saved.episode !== 'string' ||
+      typeof saved.episodeIndex !== 'number' ||
+      !Array.isArray(saved.streams)
+    ) {
+      throw new Error('Saved playback session is incomplete.');
+    }
+
+    return {
+      animeId: saved.animeId,
+      animeSlug: saved.animeSlug,
+      title: saved.title,
+      image: typeof saved.image === 'string' ? saved.image : undefined,
+      episode: saved.episode,
+      episodeIndex: saved.episodeIndex,
+      totalEpisodes:
+        typeof saved.totalEpisodes === 'number' ? saved.totalEpisodes : 0,
+      language: saved.language === 'dub' ? 'dub' : 'sub',
+      updatedAt: typeof saved.updatedAt === 'number' ? saved.updatedAt : 0,
+    };
+  } catch (cause) {
+    await AsyncStorage.removeItem(LAST_WATCHED_KEY);
+    throw new Error(
+      cause instanceof Error
+        ? `Could not read the saved playback session: ${cause.message}`
+        : 'Could not read the saved playback session.',
+    );
+  }
+}
+
+export async function saveLastWatched(
+  session: Omit<LastWatched, 'updatedAt'>,
+): Promise<void> {
+  await AsyncStorage.setItem(
+    LAST_WATCHED_KEY,
+    JSON.stringify({ ...session, updatedAt: Date.now() }),
+  );
+}
+
+export async function clearLastWatched(): Promise<void> {
+  await AsyncStorage.removeItem(LAST_WATCHED_KEY);
+}
+
 export type Anime = {
   _id?: string;
   title?: string;
@@ -68,6 +133,16 @@ export type Episode = {
     dub?: string[];
   };
 };
+
+export type StreamLanguage = 'sub' | 'dub';
+
+export function getEpisodeStreamUrls(
+  episode: Episode,
+  language: StreamLanguage,
+): string[] {
+  const urls = episode.link?.[language] ?? [];
+  return [...new Set(urls.filter((url) => /^https?:\/\//i.test(url)))];
+}
 
 export type LatestEpisode = Episode & {
   anime_info?: Anime;

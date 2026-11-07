@@ -1,9 +1,10 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Href, router } from 'expo-router';
-import React, { PropsWithChildren } from 'react';
+import React, { PropsWithChildren, useEffect, useRef } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -30,7 +31,48 @@ export function animeDetailsHref(slug: string): Href {
 }
 
 export function ScreenFrame({ children }: PropsWithChildren) {
-  return <View style={styles.screen}>{children}</View>;
+  const entrance = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(entrance, {
+      toValue: 1,
+      duration: 260,
+      useNativeDriver: true,
+    }).start();
+  }, [entrance]);
+
+  return (
+    <View style={styles.screen}>
+      <LinearGradient
+        pointerEvents="none"
+        colors={['rgba(145,111,220,0.12)', 'rgba(9,11,16,0)']}
+        style={styles.ambientTop}
+      />
+      <LinearGradient
+        pointerEvents="none"
+        colors={['rgba(82,153,139,0.07)', 'rgba(9,11,16,0)']}
+        style={styles.ambientBottom}
+      />
+      <Animated.View
+        style={[
+          styles.screenContent,
+          {
+            opacity: entrance,
+            transform: [
+              {
+                translateY: entrance.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [9, 0],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        {children}
+      </Animated.View>
+    </View>
+  );
 }
 
 export function TopBar({
@@ -149,6 +191,15 @@ export function AnimeRail({
 export function AnimeCard({ anime }: { anime: Anime }) {
   const slug = getAnimeSlug(anime);
   const title = getAnimeTitle(anime);
+  const scale = useRef(new Animated.Value(1)).current;
+  const animateFocus = (focused: boolean) => {
+    Animated.spring(scale, {
+      toValue: focused ? 1.055 : 1,
+      useNativeDriver: true,
+      speed: 24,
+      bounciness: 4,
+    }).start();
+  };
 
   return (
     <Pressable
@@ -156,10 +207,12 @@ export function AnimeCard({ anime }: { anime: Anime }) {
       accessibilityLabel={`View ${title}`}
       disabled={!slug}
       onPress={() => slug && router.push(animeDetailsHref(slug))}
+      onFocus={() => animateFocus(true)}
+      onBlur={() => animateFocus(false)}
       style={({ focused }) => [styles.card, focused && styles.cardFocused]}
     >
       {({ focused }) => (
-        <>
+        <Animated.View style={{ transform: [{ scale }] }}>
           <View
             style={[
               styles.posterFrame,
@@ -192,7 +245,7 @@ export function AnimeCard({ anime }: { anime: Anime }) {
               ? `${anime.totalEpisodes} episodes`
               : anime.Status || 'New series'}
           </Text>
-        </>
+        </Animated.View>
       )}
     </Pressable>
   );
@@ -295,9 +348,36 @@ export function ActionButton({
 }
 
 export function LoadingState({ label = 'Loading titles…' }: { label?: string }) {
+  const pulse = useRef(new Animated.Value(0.35)).current;
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 0.8,
+          duration: 650,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0.35,
+          duration: 650,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulse]);
+
   return (
     <View style={styles.state}>
-      <ActivityIndicator color={colors.accent} size="large" />
+      <Animated.View style={[styles.loadingMark, { opacity: pulse }]}>
+        <View style={styles.loadingPoster} />
+        <View style={styles.loadingCopy}>
+          <View style={styles.loadingLineLong} />
+          <View style={styles.loadingLineShort} />
+        </View>
+      </Animated.View>
+      <ActivityIndicator color={colors.accentSoft} size="small" />
       <Text style={styles.stateText}>{label}</Text>
     </View>
   );
@@ -317,6 +397,23 @@ export const palette = colors;
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  screenContent: { flex: 1 },
+  ambientTop: {
+    position: 'absolute',
+    top: -240,
+    right: -200,
+    width: 720,
+    height: 620,
+    borderRadius: 360,
+  },
+  ambientBottom: {
+    position: 'absolute',
+    bottom: -340,
+    left: -260,
+    width: 680,
+    height: 560,
+    borderRadius: 320,
+  },
   topBar: {
     height: 88,
     flexDirection: 'row',
@@ -401,7 +498,7 @@ const styles = StyleSheet.create({
   sectionSubtitle: { color: colors.muted, fontSize: 14, marginTop: 5 },
   railItems: { paddingHorizontal: '5%', paddingTop: 7, paddingBottom: 14, gap: 19 },
   card: { width: 180, borderRadius: 14, paddingBottom: 6 },
-  cardFocused: { transform: [{ scale: 1.055 }], zIndex: 1 },
+  cardFocused: { zIndex: 1 },
   posterFrame: {
     height: 252,
     overflow: 'hidden',
@@ -433,6 +530,22 @@ const styles = StyleSheet.create({
     padding: 28,
     gap: 12,
   },
+  loadingMark: {
+    width: 280,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 12,
+  },
+  loadingPoster: {
+    width: 74,
+    height: 104,
+    borderRadius: 12,
+    backgroundColor: '#282536',
+  },
+  loadingCopy: { flex: 1, gap: 12 },
+  loadingLineLong: { height: 13, width: '95%', borderRadius: 7, backgroundColor: '#252936' },
+  loadingLineShort: { height: 10, width: '62%', borderRadius: 6, backgroundColor: '#1C222C' },
   stateText: { color: colors.muted, fontSize: 15, textAlign: 'center', lineHeight: 22 },
   errorTitle: { color: colors.text, fontSize: 20, fontWeight: '800' },
 });

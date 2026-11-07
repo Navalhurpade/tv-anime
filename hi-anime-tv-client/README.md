@@ -11,9 +11,18 @@ the server root (for example, `https://animehot.cc`) or an API URL ending in
 device for future sessions.
 
 The playback screen opens the stream URL returned by the API in a native
-WebView. Those links are embedded player pages, not direct video-file URLs.
-The WebView dependency is native, so use an Android TV/Apple TV development
-build rather than Expo Go to test playback.
+WebView. It prefers Dub when available, supports switching between Sub and
+Dub, lets you choose among the API's returned mirrors, and tries another mirror
+when the embedded page reports a load error. A remote-friendly manual next
+episode action is available when the API reports the episode range.
+
+Those links are embedded player pages, not direct video-file URLs. The app
+cannot reliably control a provider's video quality, captions, or detect errors
+that happen inside its player. Native playback with app-controlled quality and
+captions requires an authorized API response containing direct HLS/DASH media
+URLs and track/rendition metadata; this project intentionally does not extract
+streams from third-party embed pages. The WebView dependency is native, so use
+an Android TV/Apple TV development build rather than Expo Go to test playback.
 
 This is an Expo project that can be built for Apple TV and Android TV targets, and also supports mobile and web platforms.
 

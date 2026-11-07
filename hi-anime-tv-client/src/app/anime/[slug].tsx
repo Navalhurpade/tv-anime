@@ -20,6 +20,7 @@ import {
   Episode,
   getAnime,
   getAnimeTitle,
+  getEpisodeStreamUrls,
   getEpisodes,
 } from '@/api/anime';
 import {
@@ -38,7 +39,7 @@ export default function AnimeDetailsScreen() {
   const slug = typeof params.slug === 'string' ? params.slug : '';
   const [anime, setAnime] = useState<Anime | null>(null);
   const [episodes, setEpisodes] = useState<Episode[]>([]);
-  const [language, setLanguage] = useState<Language>('sub');
+  const [language, setLanguage] = useState<Language>('dub');
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -79,6 +80,11 @@ export default function AnimeDetailsScreen() {
         if (active) {
           setAnime(detail);
           setEpisodes(listedEpisodes);
+          setLanguage(
+            listedEpisodes.some((episode) => getEpisodeStreamUrls(episode, 'dub').length)
+              ? 'dub'
+              : 'sub',
+          );
         }
       })
       .catch((cause: unknown) => {
@@ -96,18 +102,23 @@ export default function AnimeDetailsScreen() {
   }, [focusCycle, slug]);
 
   const playEpisode = (episode: Episode, selected: Language) => {
-    const url = episode.link?.[selected]?.[0];
-    if (!url || !anime) return;
+    const streams = getEpisodeStreamUrls(episode, selected);
+    if (!streams.length || !anime) return;
     const alternateLanguage: Language = selected === 'sub' ? 'dub' : 'sub';
-    const alternateUrl = episode.link?.[alternateLanguage]?.[0] ?? '';
-
+    const alternateStreams = getEpisodeStreamUrls(episode, alternateLanguage);
+    const episodeIndex = episodes.indexOf(episode) + 1;
     const query = new URLSearchParams({
-      url,
-      alternateUrl,
+      streams: JSON.stringify(streams),
+      alternateStreams: JSON.stringify(alternateStreams),
       language: selected,
       alternateLanguage,
       title: getAnimeTitle(anime),
       episode: String(episode.episodeNumber ?? ''),
+      episodeIndex: String(episodeIndex),
+      animeId: anime._id ?? '',
+      animeSlug: slug,
+      image: anime.image ?? '',
+      totalEpisodes: String(totalEpisodes),
     }).toString();
     router.push(`/watch?${query}` as Href);
   };
@@ -134,7 +145,7 @@ export default function AnimeDetailsScreen() {
     }
   };
 
-  const totalEpisodes = Number(anime?.totalEpisodes) || 0;
+  const totalEpisodes = Number(anime?.totalEpisodes) || episodes.length;
 
   return (
     <ScreenFrame>
@@ -216,7 +227,7 @@ export default function AnimeDetailsScreen() {
               <>
                 <View style={styles.episodeGrid}>
                   {episodes.map((episode, index) => {
-                    const available = !!episode.link?.[language]?.[0];
+                    const available = getEpisodeStreamUrls(episode, language).length > 0;
                     const number = episode.episodeNumber ?? index + 1;
                     return (
                       <Pressable
@@ -314,10 +325,21 @@ const styles = StyleSheet.create({
   detailPoster: {
     width: 220,
     height: 310,
-    borderRadius: 16,
+    borderRadius: 20,
     backgroundColor: palette.surface,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
   },
-  detailCopy: { flex: 1, maxWidth: 760, gap: 13 },
+  detailCopy: {
+    flex: 1,
+    maxWidth: 760,
+    gap: 13,
+    padding: 22,
+    borderRadius: 22,
+    backgroundColor: 'rgba(12,15,21,0.56)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
   eyebrow: { color: palette.mint, fontSize: 11, fontWeight: '800', letterSpacing: 2 },
   title: { color: palette.text, fontSize: 38, fontWeight: '800', lineHeight: 45 },
   meta: { color: '#D5D7DF', fontSize: 14, fontWeight: '600' },
@@ -331,15 +353,25 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     fontSize: 12,
   },
-  episodeSection: { paddingHorizontal: '8%', paddingTop: 12 },
+  episodeSection: {
+    marginHorizontal: '6%',
+    marginTop: 16,
+    paddingHorizontal: '2%',
+    paddingTop: 22,
+    paddingBottom: 26,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.1)',
+  },
   episodeTitle: { color: palette.text, fontSize: 26, fontWeight: '800' },
   episodeSubtitle: { color: palette.muted, fontSize: 14, marginTop: 6 },
   languageRow: { flexDirection: 'row', gap: 10, marginTop: 20, marginBottom: 19 },
   languageButton: {
-    backgroundColor: '#171C25',
+    backgroundColor: 'rgba(25,29,39,0.82)',
     paddingHorizontal: 18,
     paddingVertical: 12,
     borderRadius: 22,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   languageSelected: { backgroundColor: '#302644' },
   languageFocused: { borderWidth: 2, borderColor: palette.accentSoft },
@@ -353,7 +385,7 @@ const styles = StyleSheet.create({
     gap: 15,
     paddingHorizontal: 16,
     borderRadius: 14,
-    backgroundColor: '#11161E',
+    backgroundColor: 'rgba(17,22,30,0.82)',
     borderWidth: 1,
     borderColor: '#252D38',
   },
