@@ -5,6 +5,11 @@ React Native TV. Home collections, title search, title details, episode
 selection, subtitle/dub choice, and embedded playback are wired to the API
 examples in [docs/hi-api-docus.md](./docs/hi-api-docus.md).
 
+Use **Settings** in the top navigation to change the API base URL. Enter either
+the server root (for example, `https://animehot.cc`) or an API URL ending in
+`/api`; the app normalizes the address, lets you test it, and saves it on the
+device for future sessions.
+
 The playback screen opens the stream URL returned by the API in a native
 WebView. Those links are embedded player pages, not direct video-file URLs.
 The WebView dependency is native, so use an Android TV/Apple TV development

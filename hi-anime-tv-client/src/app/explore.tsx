@@ -1,3 +1,4 @@
+import { useFocusEffect } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -24,6 +25,13 @@ export default function SearchScreen() {
   const [error, setError] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
+  const [focusCycle, setFocusCycle] = useState(0);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      setFocusCycle((current) => current + 1);
+    }, []),
+  );
 
   useEffect(() => {
     const title = query.trim();
@@ -61,56 +69,73 @@ export default function SearchScreen() {
       active = false;
       clearTimeout(timer);
     };
-  }, [query]);
+  }, [query, focusCycle]);
 
   return (
     <ScreenFrame>
       <TopBar active="search" />
       <View style={styles.searchArea}>
-        <Text style={styles.eyebrow}>FIND YOUR NEXT SERIES</Text>
+        <Text style={styles.eyebrow}>YOUR NEXT FAVORITE STARTS HERE</Text>
         <Text style={styles.title}>Search anime</Text>
         <Text style={styles.subtitle}>
-          Search by title. Use your remote to focus the field and enter a name.
+          Find your next world to get lost in.
         </Text>
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Try “Demon Slayer”"
-          placeholderTextColor="#858B98"
-          returnKeyType="search"
-          autoCapitalize="none"
-          autoCorrect={false}
-          accessibilityLabel="Search anime by title"
-          onFocus={() => setInputFocused(true)}
-          onBlur={() => setInputFocused(false)}
-          style={[styles.input, inputFocused && styles.inputFocused]}
-        />
+        <View style={[styles.searchBox, inputFocused && styles.inputFocused]}>
+          <Text style={styles.searchIcon}>⌕</Text>
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search by title…"
+            placeholderTextColor="#858B98"
+            returnKeyType="search"
+            autoCapitalize="none"
+            autoCorrect={false}
+            accessibilityLabel="Search anime by title"
+            onFocus={() => setInputFocused(true)}
+            onBlur={() => setInputFocused(false)}
+            style={styles.input}
+          />
+          {query ? (
+            <Text style={styles.searchHint}>SEARCHING THE LIBRARY</Text>
+          ) : null}
+        </View>
         {loading ? (
           <View style={styles.message}>
             <ActivityIndicator color={palette.accent} />
-            <Text style={styles.messageText}>Searching…</Text>
+            <Text style={styles.messageText}>Finding your next favorite…</Text>
           </View>
         ) : error ? (
           <ErrorState message={error} />
         ) : hasSearched && results.length === 0 ? (
           <Text style={styles.messageText}>No titles found. Try another search.</Text>
         ) : hasSearched ? (
-          <ScrollView
-            style={styles.resultsScroll}
-            contentContainerStyle={styles.results}
-            showsVerticalScrollIndicator={false}
-          >
-            {results.map((anime, index) => (
-              <AnimeCard
-                key={anime._id ?? anime.slug ?? `result-${index}`}
-                anime={anime}
-              />
-            ))}
-          </ScrollView>
+          <>
+            <Text style={styles.resultCount}>
+              {results.length} {results.length === 1 ? 'title' : 'titles'} found
+            </Text>
+            <ScrollView
+              style={styles.resultsScroll}
+              contentContainerStyle={styles.results}
+              showsVerticalScrollIndicator={false}
+            >
+              {results.map((anime, index) => (
+                <AnimeCard
+                  key={anime._id ?? anime.slug ?? `result-${index}`}
+                  anime={anime}
+                />
+              ))}
+            </ScrollView>
+          </>
         ) : (
-          <Text style={styles.messageText}>
-            Search results will appear here as you type.
-          </Text>
+          <View style={styles.emptyState}>
+            <View style={styles.emptyGlyph}>
+              <Text style={styles.emptyGlyphText}>⌕</Text>
+            </View>
+            <Text style={styles.emptyTitle}>A whole universe awaits.</Text>
+            <Text style={styles.emptyCopy}>
+              Search for a series using your remote.
+            </Text>
+          </View>
         )}
       </View>
     </ScreenFrame>
@@ -118,24 +143,41 @@ export default function SearchScreen() {
 }
 
 const styles = StyleSheet.create({
-  searchArea: { flex: 1, paddingHorizontal: '6%', paddingTop: 26 },
-  eyebrow: { color: '#B9AFFF', fontSize: 12, fontWeight: '800', letterSpacing: 2 },
-  title: { color: palette.text, fontSize: 34, fontWeight: '900', marginTop: 7 },
-  subtitle: { color: palette.muted, fontSize: 15, marginTop: 8, marginBottom: 20 },
-  input: {
-    width: '75%',
-    minHeight: 58,
-    color: palette.text,
-    backgroundColor: palette.surfaceRaised,
-    borderWidth: 2,
-    borderColor: '#343844',
-    borderRadius: 9,
+  searchArea: { flex: 1, paddingHorizontal: '6%', paddingTop: 32 },
+  eyebrow: { color: palette.mint, fontSize: 11, fontWeight: '800', letterSpacing: 2 },
+  title: { color: palette.text, fontSize: 38, fontWeight: '800', marginTop: 8 },
+  subtitle: { color: palette.muted, fontSize: 16, marginTop: 8, marginBottom: 25 },
+  searchBox: {
+    width: '78%',
+    minHeight: 66,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 13,
     paddingHorizontal: 18,
-    fontSize: 18,
+    backgroundColor: palette.surface,
+    borderWidth: 1,
+    borderColor: palette.line,
+    borderRadius: 16,
   },
-  inputFocused: { borderColor: '#B9AFFF' },
+  searchIcon: { color: palette.accentSoft, fontSize: 33, lineHeight: 40 },
+  input: { flex: 1, minHeight: 58, color: palette.text, fontSize: 19 },
+  searchHint: { color: '#747E8B', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  inputFocused: { borderColor: palette.accentSoft, borderWidth: 2 },
   resultsScroll: { flex: 1, marginTop: 17 },
-  results: { flexDirection: 'row', flexWrap: 'wrap', gap: 20, paddingVertical: 8 },
+  results: { flexDirection: 'row', flexWrap: 'wrap', gap: 22, paddingVertical: 10 },
+  resultCount: { color: palette.muted, fontSize: 13, marginTop: 22 },
   message: { flexDirection: 'row', gap: 12, alignItems: 'center', marginTop: 28 },
-  messageText: { color: palette.muted, fontSize: 15, marginTop: 24 },
+  messageText: { color: palette.muted, fontSize: 15 },
+  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 45 },
+  emptyGlyph: {
+    width: 70,
+    height: 70,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#211B30',
+  },
+  emptyGlyphText: { color: palette.accentSoft, fontSize: 40, lineHeight: 48 },
+  emptyTitle: { color: palette.text, fontSize: 20, fontWeight: '800', marginTop: 19 },
+  emptyCopy: { color: palette.muted, fontSize: 14, marginTop: 7 },
 });

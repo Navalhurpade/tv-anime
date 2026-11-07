@@ -1,12 +1,12 @@
+import { useFocusEffect } from 'expo-router';
 import { router } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
   Anime,
   getAnimeSlug,
   getHome,
-  getAnimeTitle,
   HomeCollection,
   unwrapFeatured,
 } from '@/api/anime';
@@ -24,21 +24,26 @@ export default function HomeScreen() {
   const [home, setHome] = useState<HomeCollection | null>(null);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    let active = true;
-    getHome()
-      .then((result) => {
-        if (active) setHome(result);
-      })
-      .catch((cause: unknown) => {
-        if (active) {
-          setError(cause instanceof Error ? cause.message : 'Unable to load home.');
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      setError('');
+      getHome()
+        .then((result) => {
+          if (active) setHome(result);
+        })
+        .catch((cause: unknown) => {
+          if (active) {
+            setError(
+              cause instanceof Error ? cause.message : 'Unable to load home.',
+            );
+          }
+        });
+      return () => {
+        active = false;
+      };
+    }, []),
+  );
 
   const featured = useMemo(() => unwrapFeatured(home?.featured), [home]);
   const heroAnime = featured[0] ?? home?.trending?.animes?.[0];
@@ -56,24 +61,24 @@ export default function HomeScreen() {
           contentContainerStyle={styles.content}
         >
           {heroAnime ? <FeaturedHero anime={heroAnime} /> : null}
-          <AnimeRail title="Featured" items={featured} />
-          <AnimeRail title="Trending now" items={home.trending?.animes ?? []} />
-          <AnimeRail title="Popular anime" items={home.popular?.animes ?? []} />
           <AnimeRail
-            title="Currently airing"
-            items={home.currentlyAiring?.animes ?? []}
-          />
-          <AnimeRail
-            title="Recently added"
-            items={home.latestAnime?.animes ?? []}
-          />
-          <AnimeRail
-            title="New episodes"
+            title="Fresh episodes"
             items={
               home.latestEpisodes?.episodes
                 ?.map((episode) => episode.anime_info)
                 .filter((anime): anime is Anime => !!anime) ?? []
             }
+          />
+          <AnimeRail title="Trending now" items={home.trending?.animes ?? []} />
+          <AnimeRail
+            title="New on HiAnime"
+            items={home.latestAnime?.animes ?? []}
+          />
+          <AnimeRail title="Featured" items={featured} />
+          <AnimeRail title="Popular anime" items={home.popular?.animes ?? []} />
+          <AnimeRail
+            title="Currently airing"
+            items={home.currentlyAiring?.animes ?? []}
           />
           <AnimeRail
             title="Finished series"

@@ -1,6 +1,12 @@
 import { Image } from 'expo-image';
-import { Href, router, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
+import {
+  Href,
+  router,
+  useFocusEffect,
+  useLocalSearchParams,
+} from 'expo-router';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -37,6 +43,20 @@ export default function AnimeDetailsScreen() {
   const [loadMoreError, setLoadMoreError] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [focusCycle, setFocusCycle] = useState(0);
+  const wasBlurred = useRef(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (wasBlurred.current) {
+        setFocusCycle((current) => current + 1);
+      }
+      wasBlurred.current = false;
+      return () => {
+        wasBlurred.current = true;
+      };
+    }, []),
+  );
 
   useEffect(() => {
     if (!slug) {
@@ -73,7 +93,7 @@ export default function AnimeDetailsScreen() {
     return () => {
       active = false;
     };
-  }, [slug]);
+  }, [focusCycle, slug]);
 
   const playEpisode = (episode: Episode, selected: Language) => {
     const url = episode.link?.[selected]?.[0];
@@ -137,7 +157,12 @@ export default function AnimeDetailsScreen() {
                 transition={200}
               />
             ) : null}
-            <View style={styles.detailShade} />
+            <LinearGradient
+              colors={['rgba(9,11,16,0.28)', 'rgba(9,11,16,0.96)']}
+              start={{ x: 0.4, y: 0 }}
+              end={{ x: 0.7, y: 1 }}
+              style={styles.detailShade}
+            />
             {anime.image ? (
               <Image
                 source={{ uri: anime.image }}
@@ -277,71 +302,68 @@ function LanguageButton({
 const styles = StyleSheet.create({
   content: { paddingBottom: 48 },
   detailHero: {
-    minHeight: 410,
+    minHeight: 430,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: '7%',
-    paddingVertical: 34,
-    gap: 34,
+    paddingHorizontal: '8%',
+    paddingVertical: 38,
+    gap: 42,
     overflow: 'hidden',
   },
-  detailShade: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(8,9,13,0.78)',
-  },
+  detailShade: { ...StyleSheet.absoluteFill },
   detailPoster: {
-    width: 210,
-    height: 300,
-    borderRadius: 10,
+    width: 220,
+    height: 310,
+    borderRadius: 16,
     backgroundColor: palette.surface,
   },
-  detailCopy: { flex: 1, maxWidth: 720, gap: 12 },
-  eyebrow: { color: '#B9AFFF', fontSize: 12, fontWeight: '800', letterSpacing: 2 },
-  title: { color: palette.text, fontSize: 34, fontWeight: '900', lineHeight: 41 },
-  meta: { color: '#D5D7DF', fontSize: 15 },
-  synopsis: { color: '#BEC2CC', fontSize: 15, lineHeight: 22 },
-  genres: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  detailCopy: { flex: 1, maxWidth: 760, gap: 13 },
+  eyebrow: { color: palette.mint, fontSize: 11, fontWeight: '800', letterSpacing: 2 },
+  title: { color: palette.text, fontSize: 38, fontWeight: '800', lineHeight: 45 },
+  meta: { color: '#D5D7DF', fontSize: 14, fontWeight: '600' },
+  synopsis: { color: '#BEC2CC', fontSize: 15, lineHeight: 23 },
+  genres: { flexDirection: 'row', gap: 9, flexWrap: 'wrap' },
   genre: {
     color: palette.text,
-    backgroundColor: palette.surfaceRaised,
-    borderRadius: 5,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
+    backgroundColor: '#1C222C',
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     fontSize: 12,
   },
-  episodeSection: { paddingHorizontal: '7%', paddingTop: 12 },
-  episodeTitle: { color: palette.text, fontSize: 25, fontWeight: '900' },
-  episodeSubtitle: { color: palette.muted, fontSize: 14, marginTop: 5 },
-  languageRow: { flexDirection: 'row', gap: 10, marginTop: 20, marginBottom: 17 },
+  episodeSection: { paddingHorizontal: '8%', paddingTop: 12 },
+  episodeTitle: { color: palette.text, fontSize: 26, fontWeight: '800' },
+  episodeSubtitle: { color: palette.muted, fontSize: 14, marginTop: 6 },
+  languageRow: { flexDirection: 'row', gap: 10, marginTop: 20, marginBottom: 19 },
   languageButton: {
-    backgroundColor: palette.surfaceRaised,
-    paddingHorizontal: 17,
-    paddingVertical: 11,
-    borderRadius: 7,
+    backgroundColor: '#171C25',
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 22,
   },
-  languageSelected: { backgroundColor: palette.accent },
-  languageFocused: { borderWidth: 2, borderColor: '#FFFFFF' },
+  languageSelected: { backgroundColor: '#302644' },
+  languageFocused: { borderWidth: 2, borderColor: palette.accentSoft },
   languageText: { color: palette.text, fontSize: 14, fontWeight: '800' },
-  episodeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 11 },
+  episodeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 13 },
   episodeCard: {
     width: '31%',
-    minHeight: 72,
+    minHeight: 78,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 13,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-    backgroundColor: palette.surface,
+    gap: 15,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    backgroundColor: '#11161E',
     borderWidth: 1,
-    borderColor: '#252833',
+    borderColor: '#252D38',
   },
   episodeCardFocused: {
-    backgroundColor: '#28223F',
-    borderColor: '#B9AFFF',
+    backgroundColor: '#252035',
+    borderColor: palette.accentSoft,
     transform: [{ scale: 1.03 }],
   },
   episodeUnavailable: { opacity: 0.45 },
-  episodeNumber: { color: '#B9AFFF', fontSize: 21, fontWeight: '900' },
+  episodeNumber: { color: palette.accentSoft, fontSize: 22, fontWeight: '800' },
   episodeInfo: { flex: 1, gap: 5 },
   episodeName: { color: palette.text, fontSize: 14, fontWeight: '700' },
   episodeLanguage: { color: palette.muted, fontSize: 10, fontWeight: '800', letterSpacing: 1 },

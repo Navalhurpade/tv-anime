@@ -1,4 +1,42 @@
-const API_BASE_URL = 'https://animehot.cc/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+export const DEFAULT_API_BASE_URL = 'https://animehot.cc/api';
+const API_BASE_URL_KEY = 'hianime.apiBaseUrl';
+
+export function normalizeApiBaseUrl(value: string): string {
+  const trimmed = value.trim().replace(/\/+$/, '');
+  if (!trimmed) {
+    throw new Error('Enter an API base URL.');
+  }
+
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    throw new Error('Enter a valid URL, such as https://animehot.cc/api.');
+  }
+
+  if (!['http:', 'https:'].includes(url.protocol) || !url.hostname) {
+    throw new Error('The API URL must start with http:// or https://.');
+  }
+  if (url.username || url.password || url.search || url.hash) {
+    throw new Error('The API URL must not include credentials, a query, or a fragment.');
+  }
+
+  const path = url.pathname.replace(/\/+$/, '');
+  return `${url.origin}${path.toLowerCase().endsWith('/api') ? path : `${path}/api`}`;
+}
+
+export async function getApiBaseUrl(): Promise<string> {
+  const savedUrl = await AsyncStorage.getItem(API_BASE_URL_KEY);
+  return savedUrl ? normalizeApiBaseUrl(savedUrl) : DEFAULT_API_BASE_URL;
+}
+
+export async function saveApiBaseUrl(value: string): Promise<string> {
+  const normalizedUrl = normalizeApiBaseUrl(value);
+  await AsyncStorage.setItem(API_BASE_URL_KEY, normalizedUrl);
+  return normalizedUrl;
+}
 
 export type Anime = {
   _id?: string;
@@ -45,8 +83,15 @@ export type HomeCollection = {
   latestEpisodes?: { episodes?: LatestEpisode[] };
 };
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+async function request<T>(
+  path: string,
+  init?: RequestInit,
+  baseUrl?: string,
+): Promise<T> {
+  const apiBaseUrl = baseUrl
+    ? normalizeApiBaseUrl(baseUrl)
+    : await getApiBaseUrl();
+  const response = await fetch(`${apiBaseUrl}${path}`, {
     ...init,
     headers: {
       Accept: 'application/json',
@@ -61,8 +106,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
-export function getHome(): Promise<HomeCollection> {
-  return request<HomeCollection>('/home?slugNth=10&includeSlugs=false');
+export function getHome(baseUrl?: string): Promise<HomeCollection> {
+  return request<HomeCollection>(
+    '/home?slugNth=10&includeSlugs=false',
+    undefined,
+    baseUrl,
+  );
 }
 
 export async function searchAnime(title: string): Promise<Anime[]> {

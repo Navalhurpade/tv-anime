@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
+    "@react-native-async-storage/async-storage": "^2.2.0",
     "expo": "~57.0.13",
     "expo-build-properties": "~57.0.11",
     "expo-constants": "~57.0.11",
@@ -34,12 +35,12 @@
     "react-dom": "19.2.3",
     "react-native": "npm:react-native-tvos@0.86-stable",
     "react-native-gesture-handler": "~2.32.0",
-    "react-native-reanimated": "4.5.1",
+    "react-native-reanimated": "~4.5.3",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.2",
     "react-native-web": "~0.21.0",
-    "react-native-webview": "^14.0.1",
-    "react-native-worklets": "0.10.1"
+    "react-native-webview": "^13.16.1",
+    "react-native-worklets": "~0.10.2"
   },
   "devDependencies": {
     "@react-native-tvos/config-tv": "^0.1.6",

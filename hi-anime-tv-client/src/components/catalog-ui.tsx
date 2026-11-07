@@ -14,12 +14,15 @@ import {
 import { Anime, getAnimeSlug, getAnimeTitle } from '@/api/anime';
 
 const colors = {
-  background: '#08090D',
-  surface: '#11131A',
-  surfaceRaised: '#1B1E27',
-  text: '#F6F7FB',
-  muted: '#A1A7B4',
-  accent: '#7C5CFF',
+  background: '#090B10',
+  surface: '#11151D',
+  surfaceRaised: '#1A202A',
+  text: '#F4F5F7',
+  muted: '#9AA2AD',
+  accent: '#A98BFA',
+  accentSoft: '#D5C6FF',
+  mint: '#A3E5D2',
+  line: '#252B35',
 };
 
 export function animeDetailsHref(slug: string): Href {
@@ -30,7 +33,11 @@ export function ScreenFrame({ children }: PropsWithChildren) {
   return <View style={styles.screen}>{children}</View>;
 }
 
-export function TopBar({ active }: { active?: 'home' | 'search' }) {
+export function TopBar({
+  active,
+}: {
+  active?: 'home' | 'search' | 'settings';
+}) {
   return (
     <View style={styles.topBar}>
       <Pressable
@@ -39,14 +46,24 @@ export function TopBar({ active }: { active?: 'home' | 'search' }) {
         onPress={() => router.replace('/')}
         style={({ focused }) => [styles.brand, focused && styles.brandFocused]}
       >
-        <Text style={styles.brandMark}>H</Text>
-        <Text style={styles.brandName}>HIANIME</Text>
+        <Text style={styles.brandMark}>h</Text>
+        <Text style={styles.brandName}>
+          hi<Text style={styles.brandNameAccent}>anime</Text>
+        </Text>
       </Pressable>
       <View style={styles.navLinks}>
         <NavLink label="Home" active={active === 'home'} href="/" />
         <NavLink label="Search" active={active === 'search'} href="/explore" />
+        <NavLink
+          label="Settings"
+          active={active === 'settings'}
+          href={'/settings' as Href}
+        />
       </View>
-      <Text style={styles.topHint}>ANIME, ON YOUR TV</Text>
+      <View style={styles.remoteHint}>
+        <View style={styles.remoteDot} />
+        <Text style={styles.topHint}>MADE FOR THE BIG SCREEN</Text>
+      </View>
     </View>
   );
 }
@@ -70,9 +87,17 @@ function NavLink({
         focused && styles.navLinkFocused,
       ]}
     >
-      <Text style={[styles.navLinkText, active && styles.navLinkTextActive]}>
-        {label}
-      </Text>
+      {({ focused }) => (
+        <Text
+          style={[
+            styles.navLinkText,
+            active && styles.navLinkTextActive,
+            focused && styles.navLinkTextFocused,
+          ]}
+        >
+          {label}
+        </Text>
+      )}
     </Pressable>
   );
 }
@@ -133,31 +158,42 @@ export function AnimeCard({ anime }: { anime: Anime }) {
       onPress={() => slug && router.push(animeDetailsHref(slug))}
       style={({ focused }) => [styles.card, focused && styles.cardFocused]}
     >
-      <View style={styles.posterFrame}>
-        {anime.image ? (
-          <Image
-            source={{ uri: anime.image }}
-            style={StyleSheet.absoluteFill}
-            contentFit="cover"
-            transition={180}
-          />
-        ) : (
-          <View style={styles.posterFallback}>
-            <Text style={styles.posterFallbackText}>{title.slice(0, 1)}</Text>
+      {({ focused }) => (
+        <>
+          <View
+            style={[
+              styles.posterFrame,
+              focused && styles.posterFrameFocused,
+            ]}
+          >
+            {anime.image ? (
+              <Image
+                source={{ uri: anime.image }}
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+                transition={180}
+              />
+            ) : (
+              <View style={styles.posterFallback}>
+                <Text style={styles.posterFallbackText}>{title.slice(0, 1)}</Text>
+              </View>
+            )}
+            {anime.Type ? (
+              <View style={styles.typeBadge}>
+                <Text style={styles.typeBadgeText}>{anime.Type}</Text>
+              </View>
+            ) : null}
           </View>
-        )}
-        {anime.Type ? (
-          <View style={styles.typeBadge}>
-            <Text style={styles.typeBadgeText}>{anime.Type}</Text>
-          </View>
-        ) : null}
-      </View>
-      <Text numberOfLines={2} style={styles.cardTitle}>
-        {title}
-      </Text>
-      <Text numberOfLines={1} style={styles.cardMeta}>
-        {anime.Status || `${anime.totalEpisodes ?? 'New'} episodes`}
-      </Text>
+          <Text numberOfLines={2} style={styles.cardTitle}>
+            {title}
+          </Text>
+          <Text numberOfLines={1} style={styles.cardMeta}>
+            {anime.totalEpisodes
+              ? `${anime.totalEpisodes} episodes`
+              : anime.Status || 'New series'}
+          </Text>
+        </>
+      )}
     </Pressable>
   );
 }
@@ -194,7 +230,10 @@ export function Hero({
         style={StyleSheet.absoluteFill}
       />
       <View style={styles.heroCopy}>
-        <Text style={styles.eyebrow}>FEATURED SERIES</Text>
+        <View style={styles.heroKicker}>
+          <View style={styles.heroKickerLine} />
+          <Text style={styles.eyebrow}>TONIGHT&apos;S PICK</Text>
+        </View>
         <Text numberOfLines={2} style={styles.heroTitle}>
           {title}
         </Text>
@@ -202,7 +241,7 @@ export function Hero({
           {anime.synopsis || 'Your next favorite story starts here.'}
         </Text>
         <View style={styles.heroMeta}>
-          {anime.Score ? <Text style={styles.metaChip}>★ {anime.Score}</Text> : null}
+          {anime.Score ? <Text style={styles.metaChip}>★  {anime.Score}</Text> : null}
           {anime.Type ? <Text style={styles.metaChip}>{anime.Type}</Text> : null}
           {anime.genres?.slice(0, 3).map((genre) => (
             <Text key={genre} style={styles.metaChip}>
@@ -211,8 +250,8 @@ export function Hero({
           ))}
         </View>
         <View style={styles.heroActions}>
-          <ActionButton title="View details" primary onPress={onDetails} />
-          {onPlay ? <ActionButton title="Browse episodes" onPress={onPlay} /> : null}
+          <ActionButton title="Explore series  ›" primary onPress={onDetails} />
+          {onPlay ? <ActionButton title="Episodes" onPress={onPlay} /> : null}
         </View>
       </View>
     </View>
@@ -243,7 +282,14 @@ export function ActionButton({
         disabled && styles.actionButtonDisabled,
       ]}
     >
-      <Text style={styles.actionButtonText}>{title}</Text>
+      <Text
+        style={[
+          styles.actionButtonText,
+          primary && styles.actionButtonTextPrimary,
+        ]}
+      >
+        {title}
+      </Text>
     </Pressable>
   );
 }
@@ -272,105 +318,113 @@ export const palette = colors;
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   topBar: {
-    height: 82,
+    height: 88,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: '5%',
-    gap: 42,
+    gap: 38,
     zIndex: 2,
   },
   brand: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    padding: 8,
-    borderRadius: 10,
+    gap: 8,
+    paddingVertical: 8,
+    paddingRight: 10,
+    borderRadius: 12,
   },
-  brandFocused: { backgroundColor: colors.surfaceRaised },
+  brandFocused: { backgroundColor: colors.surfaceRaised, paddingLeft: 8 },
   brandMark: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: colors.accent,
-    color: colors.text,
+    backgroundColor: '#B598FF',
+    color: '#181226',
     textAlign: 'center',
     textAlignVertical: 'center',
-    fontSize: 23,
-    fontWeight: '900',
+    fontSize: 27,
+    fontWeight: '800',
   },
-  brandName: { color: colors.text, fontSize: 17, fontWeight: '900', letterSpacing: 2 },
-  navLinks: { flexDirection: 'row', gap: 8 },
-  navLink: { paddingHorizontal: 17, paddingVertical: 11, borderRadius: 9 },
-  navLinkActive: { backgroundColor: colors.surfaceRaised },
-  navLinkFocused: { backgroundColor: colors.accent },
-  navLinkText: { color: colors.muted, fontSize: 16, fontWeight: '700' },
-  navLinkTextActive: { color: colors.text },
+  brandName: { color: colors.text, fontSize: 19, fontWeight: '800', letterSpacing: -0.5 },
+  brandNameAccent: { color: colors.accentSoft },
+  navLinks: { flexDirection: 'row', gap: 5 },
+  navLink: { paddingHorizontal: 17, paddingVertical: 11, borderRadius: 22 },
+  navLinkActive: { backgroundColor: '#211B30' },
+  navLinkFocused: { backgroundColor: colors.accentSoft },
+  navLinkText: { color: colors.muted, fontSize: 15, fontWeight: '700' },
+  navLinkTextActive: { color: colors.accentSoft },
+  navLinkTextFocused: { color: '#181226' },
+  remoteHint: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 9 },
+  remoteDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.mint },
   topHint: {
-    marginLeft: 'auto',
-    color: '#777D89',
+    color: '#727A86',
     fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1.5,
   },
-  hero: { height: 500, marginTop: -82, justifyContent: 'flex-end' },
-  heroCopy: { width: '52%', paddingLeft: '6%', paddingBottom: 38, gap: 14 },
-  eyebrow: { color: '#B9AFFF', fontSize: 13, fontWeight: '800', letterSpacing: 2 },
-  heroTitle: { color: colors.text, fontSize: 42, fontWeight: '900', lineHeight: 49 },
-  heroSynopsis: { color: '#D0D2D9', fontSize: 16, lineHeight: 23 },
-  heroMeta: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  hero: { height: 550, marginTop: -88, justifyContent: 'flex-end' },
+  heroCopy: { width: '56%', paddingLeft: '6%', paddingBottom: 50, gap: 16 },
+  heroKicker: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  heroKickerLine: { width: 22, height: 2, backgroundColor: colors.mint },
+  eyebrow: { color: colors.mint, fontSize: 12, fontWeight: '800', letterSpacing: 2.2 },
+  heroTitle: { color: colors.text, fontSize: 46, fontWeight: '800', lineHeight: 54, letterSpacing: -1.2 },
+  heroSynopsis: { color: '#C4C9D1', fontSize: 16, lineHeight: 24 },
+  heroMeta: { flexDirection: 'row', gap: 9, flexWrap: 'wrap', marginTop: 1 },
   metaChip: {
     overflow: 'hidden',
-    color: '#E8E8EE',
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 5,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
+    color: '#DDE2E8',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 20,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
     fontSize: 12,
     fontWeight: '700',
   },
   heroActions: { flexDirection: 'row', gap: 12, marginTop: 3 },
   actionButton: {
-    minHeight: 47,
-    paddingHorizontal: 21,
+    minHeight: 50,
+    paddingHorizontal: 22,
     justifyContent: 'center',
-    borderRadius: 8,
-    backgroundColor: '#292C35',
+    borderRadius: 25,
+    backgroundColor: '#252B35',
   },
-  actionButtonPrimary: { backgroundColor: colors.accent },
+  actionButtonPrimary: { backgroundColor: colors.accentSoft },
   actionButtonFocused: { borderWidth: 3, borderColor: '#FFFFFF', transform: [{ scale: 1.04 }] },
   actionButtonPressed: { opacity: 0.8 },
   actionButtonDisabled: { opacity: 0.35 },
   actionButtonText: { color: colors.text, fontSize: 15, fontWeight: '800' },
-  rail: { marginTop: 13, marginBottom: 27 },
-  sectionHeading: { paddingHorizontal: '5%', marginBottom: 14 },
-  sectionTitle: { color: colors.text, fontSize: 23, fontWeight: '800' },
-  sectionSubtitle: { color: colors.muted, fontSize: 14, marginTop: 4 },
-  railItems: { paddingHorizontal: '5%', paddingTop: 8, paddingBottom: 12, gap: 17 },
-  card: { width: 176, borderRadius: 9, paddingBottom: 4 },
-  cardFocused: { transform: [{ scale: 1.06 }], zIndex: 1 },
+  actionButtonTextPrimary: { color: '#211A30' },
+  rail: { marginTop: 20, marginBottom: 22 },
+  sectionHeading: { paddingHorizontal: '5%', marginBottom: 13 },
+  sectionTitle: { color: colors.text, fontSize: 22, fontWeight: '800', letterSpacing: -0.35 },
+  sectionSubtitle: { color: colors.muted, fontSize: 14, marginTop: 5 },
+  railItems: { paddingHorizontal: '5%', paddingTop: 7, paddingBottom: 14, gap: 19 },
+  card: { width: 180, borderRadius: 14, paddingBottom: 6 },
+  cardFocused: { transform: [{ scale: 1.055 }], zIndex: 1 },
   posterFrame: {
-    height: 246,
+    height: 252,
     overflow: 'hidden',
-    borderRadius: 9,
+    borderRadius: 14,
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#242731',
+    borderColor: colors.line,
   },
-  posterFallback: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  posterFrameFocused: { borderWidth: 3, borderColor: colors.accentSoft },
+  posterFallback: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#171C26' },
   posterFallbackText: { color: colors.muted, fontSize: 52, fontWeight: '800' },
   typeBadge: {
     position: 'absolute',
     top: 9,
     left: 9,
-    backgroundColor: 'rgba(8,9,13,0.8)',
-    borderRadius: 4,
-    paddingHorizontal: 7,
-    paddingVertical: 4,
+    backgroundColor: 'rgba(9,11,16,0.82)',
+    borderRadius: 12,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
   },
-  typeBadgeText: { color: colors.text, fontSize: 10, fontWeight: '800' },
-  cardTitle: { color: colors.text, fontSize: 14, fontWeight: '700', marginTop: 9, lineHeight: 19 },
-  cardMeta: { color: colors.muted, fontSize: 12, marginTop: 4 },
+  typeBadgeText: { color: colors.text, fontSize: 10, fontWeight: '800', letterSpacing: 0.4 },
+  cardTitle: { color: colors.text, fontSize: 14, fontWeight: '700', marginTop: 11, lineHeight: 19 },
+  cardMeta: { color: colors.muted, fontSize: 12, marginTop: 5 },
   state: {
     flex: 1,
     minHeight: 220,
