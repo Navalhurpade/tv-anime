@@ -1,88 +1,105 @@
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { useScreenDimensions } from '@/hooks/use-screen-dimensions';
+import {
+  Anime,
+  getAnimeSlug,
+  getHome,
+  getAnimeTitle,
+  HomeCollection,
+  unwrapFeatured,
+} from '@/api/anime';
+import {
+  animeDetailsHref,
+  AnimeRail,
+  ErrorState,
+  Hero,
+  LoadingState,
+  ScreenFrame,
+  TopBar,
+} from '@/components/catalog-ui';
 
 export default function HomeScreen() {
-  const styles = useHomeStyles();
+  const [home, setHome] = useState<HomeCollection | null>(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    getHome()
+      .then((result) => {
+        if (active) setHome(result);
+      })
+      .catch((cause: unknown) => {
+        if (active) {
+          setError(cause instanceof Error ? cause.message : 'Unable to load home.');
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const featured = useMemo(() => unwrapFeatured(home?.featured), [home]);
+  const heroAnime = featured[0] ?? home?.trending?.animes?.[0];
+
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedView style={styles.titleContainer}>
-            <ThemedText type="title" style={styles.title}>
-              {`Welcome to Expo ${
-                Platform.isTV ? 'TV' : Platform.OS === 'web' ? 'web' : 'mobile'
-              }`}
-            </ThemedText>
-          </ThemedView>
-        </ThemedView>
-
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow title="Try editing" hint="src/app/index.tsx" />
-          <HintRow title="Dev tools" hint="cmd+d" />
-          <HintRow title="Fresh start" hint="npm run reset-project" />
-        </ThemedView>
-
-        <WebBadge />
-      </SafeAreaView>
-    </ThemedView>
+    <ScreenFrame>
+      <TopBar active="home" />
+      {error ? (
+        <ErrorState message={error} />
+      ) : !home ? (
+        <LoadingState />
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.content}
+        >
+          {heroAnime ? <FeaturedHero anime={heroAnime} /> : null}
+          <AnimeRail title="Featured" items={featured} />
+          <AnimeRail title="Trending now" items={home.trending?.animes ?? []} />
+          <AnimeRail title="Popular anime" items={home.popular?.animes ?? []} />
+          <AnimeRail
+            title="Currently airing"
+            items={home.currentlyAiring?.animes ?? []}
+          />
+          <AnimeRail
+            title="Recently added"
+            items={home.latestAnime?.animes ?? []}
+          />
+          <AnimeRail
+            title="New episodes"
+            items={
+              home.latestEpisodes?.episodes
+                ?.map((episode) => episode.anime_info)
+                .filter((anime): anime is Anime => !!anime) ?? []
+            }
+          />
+          <AnimeRail
+            title="Finished series"
+            items={home.finishedAiring?.animes ?? []}
+          />
+        </ScrollView>
+      )}
+    </ScreenFrame>
   );
 }
 
-const useHomeStyles = () => {
-  const { spacing, width, landscape } = useScreenDimensions();
+function FeaturedHero({ anime }: { anime: Anime }) {
+  const slug = getAnimeSlug(anime);
+  return (
+    <Hero
+      anime={anime}
+      onDetails={() => {
+        if (slug) router.push(animeDetailsHref(slug));
+      }}
+      onPlay={() => {
+        if (slug) router.push(animeDetailsHref(slug));
+      }}
+    />
+  );
+}
 
-  return StyleSheet.create({
-    container: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      width,
-    },
-    safeArea: {
-      marginTop: landscape ? spacing.six : 0,
-      marginBottom: landscape ? spacing.two : spacing.six,
-      paddingHorizontal: spacing.four,
-      alignItems: 'center',
-      justifyContent: 'flex-end',
-      gap: spacing.three,
-      maxWidth: width * 0.8,
-    },
-    heroSection: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      flex: 1,
-      paddingHorizontal: spacing.four,
-      gap: landscape ? spacing.one : spacing.four,
-      marginBottom: landscape ? spacing.four : spacing.six,
-    },
-    titleContainer: {
-      marginTop: landscape ? spacing.two : 0,
-    },
-    title: {
-      textAlign: 'center',
-    },
-    code: {
-      lineHeight: spacing.four,
-      textTransform: 'uppercase',
-    },
-    stepContainer: {
-      gap: spacing.three,
-      alignSelf: 'stretch',
-      paddingHorizontal: spacing.three,
-      paddingVertical: spacing.four,
-      borderRadius: spacing.four,
-    },
-  });
-};
+const styles = StyleSheet.create({
+  content: { paddingBottom: 52 },
+});

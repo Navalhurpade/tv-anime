@@ -1,5 +1,15 @@
 # Expo Router TV demo 👋
 
+This app is a TV-first HiAnime catalog client built with Expo Router and
+React Native TV. Home collections, title search, title details, episode
+selection, subtitle/dub choice, and embedded playback are wired to the API
+examples in [docs/hi-api-docus.md](./docs/hi-api-docus.md).
+
+The playback screen opens the stream URL returned by the API in a native
+WebView. Those links are embedded player pages, not direct video-file URLs.
+The WebView dependency is native, so use an Android TV/Apple TV development
+build rather than Expo Go to test playback.
+
 This is an Expo project that can be built for Apple TV and Android TV targets, and also supports mobile and web platforms.
 
 In addition to Expo SDK packages, this project uses
