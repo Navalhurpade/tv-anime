@@ -1,12 +1,15 @@
 import { Href, router, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  BackHandler,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
+  type HWEvent,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 
@@ -18,6 +21,12 @@ import {
   StreamLanguage,
 } from '@/api/anime';
 import { ActionButton, ScreenFrame, palette } from '@/components/catalog-ui';
+
+const useRemoteEventHandler: (handler: (event: HWEvent) => void) => void =
+  Platform.isTV
+    ? // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require('react-native').useTVEventHandler
+    : () => {};
 
 type WatchParams = {
   streams?: string | string[];
@@ -125,13 +134,64 @@ export default function WatchScreen() {
   const [nextLoading, setNextLoading] = useState(false);
   const [nextError, setNextError] = useState('');
   const [saveError, setSaveError] = useState('');
+  const [chromeVisible, setChromeVisible] = useState(true);
+  const [interactionMode, setInteractionMode] = useState(false);
+  const [chromeActivity, setChromeActivity] = useState(0);
+  const webViewRef = useRef<WebView | null>(null);
   const attemptedSources = useRef(new Set<string>());
+
+  const revealChrome = useCallback(() => {
+    setChromeVisible(true);
+    setChromeActivity((activity) => activity + 1);
+  }, []);
+
+  const handleTVEvent = useCallback(
+    (event: HWEvent) => {
+      if (
+        event.eventType === 'focus' ||
+        event.eventType === 'blur' ||
+        event.eventType === 'pan'
+      ) {
+        return;
+      }
+      if (!interactionMode) revealChrome();
+    },
+    [interactionMode, revealChrome],
+  );
+  useRemoteEventHandler(handleTVEvent);
+
+  useEffect(() => {
+    if (!chromeVisible || loading || interactionMode) return;
+    const timer = setTimeout(() => setChromeVisible(false), 5000);
+    return () => clearTimeout(timer);
+  }, [chromeActivity, chromeVisible, interactionMode, loading]);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (interactionMode) {
+        setInteractionMode(false);
+        revealChrome();
+      } else if (!chromeVisible) {
+        revealChrome();
+      } else {
+        router.back();
+      }
+      return true;
+    });
+    return () => subscription.remove();
+  }, [chromeVisible, interactionMode, revealChrome]);
+
+  useEffect(() => {
+    if (interactionMode) webViewRef.current?.requestFocus();
+  }, [interactionMode]);
 
   useEffect(() => {
     setLanguage(requested.language);
     setMirrorIndex(0);
     setReloadToken((token) => token + 1);
     setLoading(true);
+    setChromeVisible(true);
+    setInteractionMode(false);
     setRecoveryMessage('');
     setRecoveryVisible(false);
     setMirrorChooserVisible(false);
@@ -299,60 +359,88 @@ export default function WatchScreen() {
 
   return (
     <ScreenFrame>
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.back()}
-          style={({ focused }) => [styles.backButton, focused && styles.focused]}
-        >
-          <Text style={styles.buttonText}>←  Back</Text>
-        </Pressable>
-        <View style={styles.titleBlock}>
-          <Text numberOfLines={1} style={styles.title}>
-            {title}
-          </Text>
-          <Text style={styles.subtitle}>
-            {requested.episode ? `Episode ${requested.episode}  ·  ` : ''}
-            {selectedLanguage === 'sub' ? 'Japanese · Subtitles' : 'English · Dub'}
-            {streams.length > 1 ? `  ·  Mirror ${mirrorIndex + 1}/${streams.length}` : ''}
-          </Text>
-        </View>
-        {canSwitchLanguage ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Switch to ${selectedLanguage === 'sub' ? 'English dub' : 'subtitles'}`}
-            onPress={switchLanguage}
-            style={({ focused }) => [styles.languageButton, focused && styles.focused]}
-          >
-            <Text style={styles.buttonText}>
-              Switch to {selectedLanguage === 'sub' ? 'DUB' : 'SUB'}
-            </Text>
-          </Pressable>
-        ) : null}
-        {hasNextEpisode ? (
-          <Pressable
-            accessibilityRole="button"
-            disabled={nextLoading}
-            onPress={playNextEpisode}
-            style={({ focused }) => [
-              styles.nextButton,
-              focused && styles.focused,
-              nextLoading && styles.disabled,
-            ]}
-          >
-            <Text style={styles.buttonText}>
-              {nextLoading ? 'Loading…' : 'Next episode  ›'}
-            </Text>
-          </Pressable>
-        ) : null}
-      </View>
-      {saveError ? <Text style={styles.saveError}>{saveError}</Text> : null}
+      {chromeVisible && !interactionMode ? (
+        <>
+          <View style={styles.header}>
+            <Pressable
+              accessibilityRole="button"
+              hasTVPreferredFocus={Platform.isTV}
+              onPress={() => router.back()}
+              style={({ focused }) => [styles.backButton, focused && styles.focused]}
+            >
+              <Text style={styles.buttonText}>←  Back</Text>
+            </Pressable>
+            <View style={styles.titleBlock}>
+              <Text numberOfLines={1} style={styles.title}>
+                {title}
+              </Text>
+              <Text style={styles.subtitle}>
+                {requested.episode ? `Episode ${requested.episode}  ·  ` : ''}
+                {selectedLanguage === 'sub'
+                  ? 'Japanese · Subtitles'
+                  : 'English · Dub'}
+                {streams.length > 1
+                  ? `  ·  Mirror ${mirrorIndex + 1}/${streams.length}`
+                  : ''}
+              </Text>
+            </View>
+            {canSwitchLanguage ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Switch to ${selectedLanguage === 'sub' ? 'English dub' : 'subtitles'}`}
+                onPress={switchLanguage}
+                style={({ focused }) => [
+                  styles.languageButton,
+                  focused && styles.focused,
+                ]}
+              >
+                <Text style={styles.buttonText}>
+                  Switch to {selectedLanguage === 'sub' ? 'DUB' : 'SUB'}
+                </Text>
+              </Pressable>
+            ) : null}
+            {hasNextEpisode ? (
+              <Pressable
+                accessibilityRole="button"
+                disabled={nextLoading}
+                onPress={playNextEpisode}
+                style={({ focused }) => [
+                  styles.nextButton,
+                  focused && styles.focused,
+                  nextLoading && styles.disabled,
+                ]}
+              >
+                <Text style={styles.buttonText}>
+                  {nextLoading ? 'Loading…' : 'Next episode  ›'}
+                </Text>
+              </Pressable>
+            ) : null}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Interact with the embedded page using the remote"
+              disabled={!sourceUrl}
+              onPress={() => setInteractionMode(true)}
+              style={({ focused }) => [
+                styles.interactionButton,
+                focused && styles.focused,
+                !sourceUrl && styles.disabled,
+              ]}
+            >
+              <Text style={styles.buttonText}>Interact</Text>
+            </Pressable>
+          </View>
+          {saveError ? <Text style={styles.saveError}>{saveError}</Text> : null}
+        </>
+      ) : null}
       {sourceUrl ? (
         <View style={styles.playerContainer}>
-          <WebView
+          <WebView<unknown>
+            ref={webViewRef}
             key={`${sourceUrl}:${reloadToken}`}
             source={{ uri: sourceUrl }}
             style={styles.player}
+            focusable
+            hasTVPreferredFocus={Platform.isTV && interactionMode}
             originWhitelist={['http://*', 'https://*']}
             javaScriptEnabled
             domStorageEnabled
@@ -360,9 +448,20 @@ export default function WatchScreen() {
             mediaPlaybackRequiresUserAction={false}
             onLoadStart={() => setLoading(true)}
             onLoad={() => setLoading(false)}
-            onLoadEnd={() => setLoading(false)}
+            onLoadEnd={() => {
+              setLoading(false);
+              if (interactionMode) webViewRef.current?.requestFocus();
+            }}
             onError={() => handlePlayerError(sourceUrl)}
           />
+          {interactionMode ? (
+            <View pointerEvents="none" style={styles.interactionNotice}>
+              <Text style={styles.interactionNoticeTitle}>PAGE INTERACTION</Text>
+              <Text style={styles.interactionNoticeText}>
+                Use the D-pad and Select to navigate the page. Press Back to resume playback.
+              </Text>
+            </View>
+          ) : null}
           {loading ? (
             <View style={styles.loading}>
               <ActivityIndicator size="large" color={palette.accentSoft} />
@@ -524,11 +623,37 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     backgroundColor: '#253A35',
   },
+  interactionButton: {
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 22,
+    backgroundColor: '#263447',
+  },
   buttonText: { color: palette.text, fontSize: 13, fontWeight: '800' },
   focused: { borderWidth: 2, borderColor: palette.accentSoft },
   disabled: { opacity: 0.45 },
   playerContainer: { flex: 1, backgroundColor: '#000000' },
   player: { flex: 1, backgroundColor: '#000000' },
+  interactionNotice: {
+    position: 'absolute',
+    top: 16,
+    left: 18,
+    maxWidth: 480,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    borderRadius: 12,
+    backgroundColor: 'rgba(17,21,29,0.96)',
+    borderColor: '#343B48',
+    borderWidth: 1,
+    gap: 4,
+  },
+  interactionNoticeTitle: {
+    color: palette.mint,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  interactionNoticeText: { color: palette.text, fontSize: 13, lineHeight: 18 },
   loading: {
     ...StyleSheet.absoluteFill,
     alignItems: 'center',

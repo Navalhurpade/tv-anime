@@ -16,6 +16,17 @@ Dub, lets you choose among the API's returned mirrors, and tries another mirror
 when the embedded page reports a load error. A remote-friendly manual next
 episode action is available when the API reports the episode range.
 
+During playback, the app header hides after five seconds of inactivity and
+reappears when the remote is used. Back first reveals a hidden header; press
+Back again to leave playback. Choose **Interact** in the header to move focus
+into the embedded page and use the D-pad and Select on its controls; Back exits
+that mode. This uses the WebView's page focus/navigation rather than a simulated
+mouse cursor, so a provider challenge must expose controls that the TV WebView
+can focus. CAPTCHA challenges are not solved or bypassed by the app. If a
+challenge cannot be operated with the remote, try another available mirror or
+return to the episode list. Ads remain part of the provider page; only select
+controls you recognize.
+
 The Home screen also keeps a local **Continue watching** entry for the latest
 episode opened, including its selected Sub/Dub version. Resume requests fresh
 episode links from the API rather than persisting embed URLs. The embed does not
