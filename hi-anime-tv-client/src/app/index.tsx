@@ -6,11 +6,14 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   Anime,
   clearLastWatched,
+  getEpisodeStreamUrls,
+  getEpisodes,
   getLastWatched,
   getAnimeSlug,
   getHome,
   HomeCollection,
   LastWatched,
+  StreamLanguage,
   unwrapFeatured,
 } from '@/api/anime';
 import {
@@ -32,6 +35,64 @@ export default function HomeScreen() {
   const [error, setError] = useState('');
   const [lastWatched, setLastWatched] = useState<LastWatched | null>(null);
   const [resumeError, setResumeError] = useState('');
+  const [resumeLoading, setResumeLoading] = useState(false);
+
+  const resumeLastWatched = async () => {
+    if (!lastWatched || resumeLoading) return;
+    setResumeLoading(true);
+    setResumeError('');
+    try {
+      if (!lastWatched.animeId || lastWatched.episodeIndex < 1) {
+        throw new Error('This saved episode is incomplete. Open the title again from Search.');
+      }
+
+      const episodes = await getEpisodes(
+        lastWatched.animeId,
+        lastWatched.episodeIndex,
+        lastWatched.episodeIndex,
+      );
+      const episode = episodes[0];
+      if (!episode) {
+        throw new Error('This episode is no longer available from the API.');
+      }
+
+      const language: StreamLanguage =
+        getEpisodeStreamUrls(episode, lastWatched.language).length > 0
+          ? lastWatched.language
+          : lastWatched.language === 'sub'
+            ? 'dub'
+            : 'sub';
+      const streams = getEpisodeStreamUrls(episode, language);
+      if (!streams.length) {
+        throw new Error('No playable Sub or Dub stream is currently available.');
+      }
+      const alternateLanguage: StreamLanguage = language === 'sub' ? 'dub' : 'sub';
+      const query = new URLSearchParams({
+        streams: JSON.stringify(streams),
+        alternateStreams: JSON.stringify(
+          getEpisodeStreamUrls(episode, alternateLanguage),
+        ),
+        language,
+        alternateLanguage,
+        title: lastWatched.title,
+        episode: String(episode.episodeNumber ?? lastWatched.episode),
+        episodeIndex: String(lastWatched.episodeIndex),
+        animeId: lastWatched.animeId,
+        animeSlug: lastWatched.animeSlug,
+        image: lastWatched.image ?? '',
+        totalEpisodes: String(lastWatched.totalEpisodes),
+      });
+      router.push(`/watch?${query.toString()}` as Href);
+    } catch (cause) {
+      setResumeError(
+        cause instanceof Error
+          ? cause.message
+          : 'Unable to resume the saved episode.',
+      );
+    } finally {
+      setResumeLoading(false);
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -90,6 +151,8 @@ export default function HomeScreen() {
           {lastWatched ? (
             <ContinueWatching
               session={lastWatched}
+              loading={resumeLoading}
+              onResume={resumeLastWatched}
               onDismiss={() => {
                 clearLastWatched()
                   .then(() => setLastWatched(null))
@@ -134,29 +197,15 @@ export default function HomeScreen() {
 
 function ContinueWatching({
   session,
+  loading,
+  onResume,
   onDismiss,
 }: {
   session: LastWatched;
+  loading: boolean;
+  onResume: () => void;
   onDismiss: () => void;
 }) {
-  const resume = () => {
-    if (!session.streams.length) return;
-    const query = new URLSearchParams({
-      streams: JSON.stringify(session.streams),
-      alternateStreams: JSON.stringify(session.alternateStreams),
-      language: session.language,
-      alternateLanguage: session.alternateLanguage,
-      title: session.title,
-      episode: session.episode,
-      episodeIndex: String(session.episodeIndex),
-      animeId: session.animeId,
-      animeSlug: session.animeSlug,
-      image: session.image ?? '',
-      totalEpisodes: String(session.totalEpisodes),
-    });
-    router.push(`/watch?${query.toString()}` as Href);
-  };
-
   return (
     <View style={styles.continueSection}>
       <View style={styles.continueHeading}>
@@ -169,8 +218,8 @@ function ContinueWatching({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`Continue ${session.title}, episode ${session.episode}`}
-        disabled={!session.streams.length}
-        onPress={resume}
+        disabled={loading}
+        onPress={onResume}
         style={({ focused, pressed }) => [
           styles.continueCard,
           focused && styles.continueFocused,
@@ -199,13 +248,11 @@ function ContinueWatching({
             {session.language.toUpperCase()}
           </Text>
           <Text style={styles.resumeLabel}>
-            {session.streams.length
-              ? 'Resume this episode'
-              : 'No saved stream is available'}
+            {loading ? 'Loading your episode…' : 'Resume this episode'}
           </Text>
         </View>
         <View style={styles.playButton}>
-          <Text style={styles.playButtonText}>▶</Text>
+          <Text style={styles.playButtonText}>{loading ? '…' : '▶'}</Text>
         </View>
       </Pressable>
       <Text style={styles.resumeDisclaimer}>

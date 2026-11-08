@@ -148,9 +148,6 @@ export default function WatchScreen() {
         episodeIndex: requested.episodeIndex,
         totalEpisodes: requested.totalEpisodes,
         language: requested.language,
-        alternateLanguage: requested.alternateLanguage,
-        streams: requested.streams,
-        alternateStreams: requested.alternateStreams,
       }).catch((cause: unknown) => {
         setSaveError(
           cause instanceof Error
@@ -194,15 +191,6 @@ export default function WatchScreen() {
         episodeIndex: requested.episodeIndex,
         totalEpisodes: requested.totalEpisodes,
         language: nextLanguage,
-        alternateLanguage:
-          nextLanguage === requested.language
-            ? requested.alternateLanguage
-            : requested.language,
-        streams: nextStreams,
-        alternateStreams:
-          nextLanguage === requested.language
-            ? requested.alternateStreams
-            : requested.streams,
       }).catch((cause: unknown) => {
         setSaveError(
           cause instanceof Error
@@ -358,6 +346,7 @@ export default function WatchScreen() {
           </Pressable>
         ) : null}
       </View>
+      {saveError ? <Text style={styles.saveError}>{saveError}</Text> : null}
       {sourceUrl ? (
         <View style={styles.playerContainer}>
           <WebView
@@ -515,6 +504,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#202631',
   },
   titleBlock: { flex: 1, gap: 5 },
+  saveError: {
+    backgroundColor: '#382426',
+    color: '#FFDAD6',
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+  },
   title: { color: palette.text, fontSize: 17, fontWeight: '800' },
   subtitle: { color: palette.muted, fontSize: 12 },
   languageButton: {

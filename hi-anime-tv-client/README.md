@@ -16,6 +16,12 @@ Dub, lets you choose among the API's returned mirrors, and tries another mirror
 when the embedded page reports a load error. A remote-friendly manual next
 episode action is available when the API reports the episode range.
 
+The Home screen also keeps a local **Continue watching** entry for the latest
+episode opened, including its selected Sub/Dub version. Resume requests fresh
+episode links from the API rather than persisting embed URLs. The embed does not
+expose playback position, so continuing starts that episode from the beginning.
+Use **Remove** on the shelf to clear the saved entry from the device.
+
 Those links are embedded player pages, not direct video-file URLs. The app
 cannot reliably control a provider's video quality, captions, or detect errors
 that happen inside its player. Native playback with app-controlled quality and
@@ -77,6 +83,8 @@ This project includes a [demo](./src/components/tv-event-demo.tsx) showing how t
 
 Deploy on all platforms with Expo Application Services (EAS).
 
+- Build an Android TV APK: `npm run build:apk` — EAS uploads the build and
+  provides a link to download the APK when it completes.
 - Deploy the website: `npx eas-cli deploy` — [Learn more](https://docs.expo.dev/eas/hosting/get-started/)
 - Deploy on iOS and Android using: `npx eas-cli build` — [Learn more](https://expo.dev/eas)
 

@@ -11,6 +11,7 @@
     "lint": "expo lint",
     "prebuild": "expo prebuild --clean",
     "prebuild:tv": "EXPO_TV=1 expo prebuild --clean",
+    "build:apk": "npx eas-cli@latest build --platform android --profile preview_tv",
     "deploy": "npx expo export -p web && npx eas-cli@latest deploy"
   },
   "dependencies": {

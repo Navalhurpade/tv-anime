@@ -62,8 +62,7 @@ export async function getLastWatched(): Promise<LastWatched | null> {
       typeof saved.animeSlug !== 'string' ||
       typeof saved.title !== 'string' ||
       typeof saved.episode !== 'string' ||
-      typeof saved.episodeIndex !== 'number' ||
-      !Array.isArray(saved.streams)
+      typeof saved.episodeIndex !== 'number'
     ) {
       throw new Error('Saved playback session is incomplete.');
     }
