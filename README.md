@@ -18,14 +18,18 @@ episode action is available when the API reports the episode range.
 
 During playback, the app header hides after five seconds of inactivity and
 reappears when the remote is used. Back first reveals a hidden header; press
-Back again to leave playback. Choose **Interact** in the header to move focus
-into the embedded page and use the D-pad and Select on its controls; Back exits
-that mode. This uses the WebView's page focus/navigation rather than a simulated
-mouse cursor, so a provider challenge must expose controls that the TV WebView
-can focus. CAPTCHA challenges are not solved or bypassed by the app. If a
-challenge cannot be operated with the remote, try another available mirror or
-return to the episode list. Ads remain part of the provider page; only select
-controls you recognize.
+Back again to leave playback. Choose **Pointer** in the header to enter
+pointer mode: an on-screen cursor appears over the embedded page, the D-pad
+moves it (hold a direction to accelerate), and Select / Play-Pause taps at the
+cursor position. Back exits pointer mode. Taps are synthesized via
+`injectJavaScript` as `pointer`/`mouse`/`click` events dispatched at
+`document.elementFromPoint`. Because browsers block synthetic events from
+crossing origin boundaries, a tap over a cross-origin iframe (for example a
+hCaptcha / Cloudflare Turnstile / reCAPTCHA challenge hosted on a different
+domain) may be ignored; the overlay surfaces a hint when that happens. In
+those cases try another available mirror or return to the episode list.
+CAPTCHA challenges are not solved or bypassed by the app, and ads remain part
+of the provider page — only tap controls you recognize.
 
 The Home screen also keeps a local **Continue watching** entry for the latest
 episode opened, including its selected Sub/Dub version. Resume requests fresh

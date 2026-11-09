@@ -2,7 +2,10 @@ import { Href, router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   BackHandler,
+  findNodeHandle,
+  type LayoutChangeEvent,
   Modal,
   Platform,
   Pressable,
@@ -21,6 +24,10 @@ import {
   StreamLanguage,
 } from '@/api/anime';
 import { ActionButton, ScreenFrame, palette } from '@/components/catalog-ui';
+import { TVFocusGuideView } from '@/components/tv-focus-guide';
+
+const CURSOR_SIZE = 14;
+const CURSOR_RING = 34;
 
 const useRemoteEventHandler: (handler: (event: HWEvent) => void) => void =
   Platform.isTV
@@ -137,16 +144,210 @@ export default function WatchScreen() {
   const [chromeVisible, setChromeVisible] = useState(true);
   const [interactionMode, setInteractionMode] = useState(false);
   const [chromeActivity, setChromeActivity] = useState(0);
+  const [playerSize, setPlayerSize] = useState({ width: 0, height: 0 });
+  const [cursorHint, setCursorHint] = useState('');
   const webViewRef = useRef<WebView | null>(null);
   const attemptedSources = useRef(new Set<string>());
+  const overlayRef = useRef<View | null>(null);
+  const [overlayTag, setOverlayTag] = useState<number | null>(null);
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      webViewRef.current = null;
+    };
+  }, []);
+
+  // --- Cursor driven by Animated values (native driver → no re-render on move).
+  // The raw X/Y are kept in refs so handlers can read them without stale
+  // closures. Animated.Values drive the visual transform smoothly.
+  const cursorX = useRef(new Animated.Value(0)).current;
+  const cursorY = useRef(new Animated.Value(0)).current;
+  const cursorPos = useRef({ x: 0, y: 0 });
+  // Per-direction acceleration state. Each direction tracks the timestamp of
+  // the last press so holds ramp up quickly and taps stay precise.
+  const repeatInfo = useRef<Record<string, { count: number; last: number }>>({
+    up: { count: 0, last: 0 },
+    down: { count: 0, last: 0 },
+    left: { count: 0, last: 0 },
+    right: { count: 0, last: 0 },
+  });
 
   const revealChrome = useCallback(() => {
     setChromeVisible(true);
     setChromeActivity((activity) => activity + 1);
   }, []);
 
+  // Last time we pushed a synthetic mouse-hover into the WebView; throttled
+  // so we don't flood the bridge during rapid movement.
+  const lastHoverSent = useRef(0);
+
+  // Fire synthetic mouse/pointer "move" events into the embedded page at the
+  // current cursor position. Most video embeds hide their control bar after
+  // inactivity and only re-show it on real mouse movement, so without this
+  // our RN cursor can click precisely but the player's gear/quality/
+  // fullscreen icons never appear.
+  const hoverAtCursor = useCallback(
+    (force = false) => {
+      const webView = webViewRef.current;
+      if (!webView) return;
+      const now = Date.now();
+      if (!force && now - lastHoverSent.current < 60) return;
+      lastHoverSent.current = now;
+      const x = Math.round(cursorPos.current.x);
+      const y = Math.round(cursorPos.current.y);
+      const js = `(function(){try{
+        var x=${x | 0},y=${y | 0};
+        var el=document.elementFromPoint(x,y);
+        if(!el) return;
+        var opts={bubbles:true,cancelable:true,composed:true,view:window,
+          clientX:x,clientY:y,screenX:x,screenY:y,
+          button:0,buttons:0,pointerType:'mouse',isPrimary:true,pointerId:1};
+        try{ el.dispatchEvent(new PointerEvent('pointermove',opts)); }catch(_){}
+        try{ el.dispatchEvent(new MouseEvent('mousemove',opts)); }catch(_){}
+        try{ el.dispatchEvent(new MouseEvent('mouseover',opts)); }catch(_){}
+        try{ el.dispatchEvent(new PointerEvent('pointerover',opts)); }catch(_){}
+        // Many HTML5 players listen on document/window, not the element.
+        try{ document.dispatchEvent(new MouseEvent('mousemove',opts)); }catch(_){}
+      }catch(_){}})(); true;`;
+      webView.injectJavaScript(js);
+    },
+    [],
+  );
+
+  const setCursorPos = useCallback(
+    (x: number, y: number, animated = true) => {
+      const w = playerSize.width || 1280;
+      const h = playerSize.height || 720;
+      const nx = Math.max(0, Math.min(w - 1, x));
+      const ny = Math.max(0, Math.min(h - 1, y));
+      cursorPos.current.x = nx;
+      cursorPos.current.y = ny;
+      if (animated) {
+        Animated.parallel([
+          Animated.timing(cursorX, {
+            toValue: nx,
+            duration: 80,
+            useNativeDriver: true,
+          }),
+          Animated.timing(cursorY, {
+            toValue: ny,
+            duration: 80,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      } else {
+        cursorX.setValue(nx);
+        cursorY.setValue(ny);
+      }
+      // Wake up the player's auto-hide controls.
+      hoverAtCursor();
+    },
+    [playerSize.width, playerSize.height, cursorX, cursorY, hoverAtCursor],
+  );
+
+  const moveCursor = useCallback(
+    (direction: 'up' | 'down' | 'left' | 'right') => {
+      const w = playerSize.width || 1280;
+      const now = Date.now();
+      const info = repeatInfo.current[direction];
+      // Reset the ramp for every other direction so a quick turn is precise.
+      Object.keys(repeatInfo.current).forEach((d) => {
+        if (d !== direction) repeatInfo.current[d] = { count: 0, last: 0 };
+      });
+      // Within 260 ms of the previous press? That's a hold → accelerate.
+      if (now - info.last < 260) {
+        info.count = Math.min(info.count + 1, 30);
+      } else {
+        info.count = 0;
+      }
+      info.last = now;
+      // Base = 1.5 % of width (≈ 14 px at 960 w), max multiplier 6×.
+      const base = Math.max(14, Math.round(w * 0.015));
+      const multiplier = 1 + Math.min(info.count, 25) * 0.22;
+      const step = Math.round(base * multiplier);
+      const dx = direction === 'left' ? -step : direction === 'right' ? step : 0;
+      const dy = direction === 'up' ? -step : direction === 'down' ? step : 0;
+      setCursorPos(cursorPos.current.x + dx, cursorPos.current.y + dy);
+    },
+    [playerSize.width, setCursorPos],
+  );
+
+  const clickAtCursor = useCallback(() => {
+    const webView = webViewRef.current;
+    if (!webView) return;
+    const x = Math.round(cursorPos.current.x);
+    const y = Math.round(cursorPos.current.y);
+    const js = `(function(){try{
+      var x=${x|0},y=${y|0};
+      var el=document.elementFromPoint(x,y);
+      var tag=el?(el.tagName||'').toLowerCase():'none';
+      var inIframe=tag==='iframe';
+      if(el){
+        try{ if(el.focus) el.focus({preventScroll:true}); }catch(_){}
+        var opts={bubbles:true,cancelable:true,composed:true,view:window,clientX:x,clientY:y,screenX:x,screenY:y,button:0,buttons:1,pointerType:'mouse',isPrimary:true,pointerId:1};
+        try{ el.dispatchEvent(new PointerEvent('pointerover',opts)); }catch(_){}
+        try{ el.dispatchEvent(new PointerEvent('pointerenter',opts)); }catch(_){}
+        try{ el.dispatchEvent(new MouseEvent('mouseover',opts)); }catch(_){}
+        try{ el.dispatchEvent(new MouseEvent('mousemove',opts)); }catch(_){}
+        try{ el.dispatchEvent(new PointerEvent('pointerdown',opts)); }catch(_){}
+        try{ el.dispatchEvent(new MouseEvent('mousedown',opts)); }catch(_){}
+        try{ el.dispatchEvent(new PointerEvent('pointerup',Object.assign({},opts,{buttons:0}))); }catch(_){}
+        try{ el.dispatchEvent(new MouseEvent('mouseup',Object.assign({},opts,{buttons:0}))); }catch(_){}
+        try{ el.dispatchEvent(new MouseEvent('click',Object.assign({},opts,{buttons:0}))); }catch(_){}
+        try{ if(typeof el.click==='function') el.click(); }catch(_){}
+      }
+      window.ReactNativeWebView&&window.ReactNativeWebView.postMessage(JSON.stringify({type:'cursor-click',tag:tag,inIframe:inIframe}));
+    }catch(e){
+      window.ReactNativeWebView&&window.ReactNativeWebView.postMessage(JSON.stringify({type:'cursor-click-error',message:String(e)}));
+    } })(); true;`;
+    webView.injectJavaScript(js);
+  }, []);
+
+  // Hold-to-repeat state. Android TV's useTVEventHandler only emits ONE
+  // event per long-press (longXxx action=0 at hold-start, action=1 at
+  // hold-end). To get continuous cursor motion while a direction is held,
+  // we start an interval on the "begin" event and clear it on the "end".
+  const holdIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const holdDirectionRef = useRef<'up' | 'down' | 'left' | 'right' | null>(
+    null,
+  );
+
+  const stopHold = useCallback(() => {
+    if (holdIntervalRef.current != null) {
+      clearInterval(holdIntervalRef.current);
+      holdIntervalRef.current = null;
+    }
+    holdDirectionRef.current = null;
+  }, []);
+
+  const startHold = useCallback(
+    (direction: 'up' | 'down' | 'left' | 'right') => {
+      stopHold();
+      holdDirectionRef.current = direction;
+      // Fire immediately so hold is responsive, then every 55ms for ~18 Hz
+      // cursor updates — the Animated.timing will blend them smoothly.
+      moveCursor(direction);
+      holdIntervalRef.current = setInterval(() => {
+        if (holdDirectionRef.current) moveCursor(holdDirectionRef.current);
+      }, 55);
+    },
+    [moveCursor, stopHold],
+  );
+
+  // Make sure any dangling hold interval is cleared when pointer mode exits
+  // or on unmount.
+  useEffect(() => {
+    if (!interactionMode) stopHold();
+  }, [interactionMode, stopHold]);
+  useEffect(() => () => stopHold(), [stopHold]);
+
   const handleTVEvent = useCallback(
     (event: HWEvent) => {
+      const actionRaw = (event as unknown as { eventKeyAction?: unknown })
+        .eventKeyAction;
+
       if (
         event.eventType === 'focus' ||
         event.eventType === 'blur' ||
@@ -154,9 +355,80 @@ export default function WatchScreen() {
       ) {
         return;
       }
-      if (!interactionMode) revealChrome();
+
+      if (!interactionMode) {
+        revealChrome();
+        return;
+      }
+
+      // On this RN-tvos build (Android TV):
+      //   action === 1  →  short press (single discrete event).
+      //   action === 0  →  long-press "begin" (longXxx event, no repeats).
+      //   action === 1  →  long-press "end"   (longXxx event).
+      // So a held D-pad arrow only gives us one longXxx/0 then one longXxx/1
+      // with nothing in between. We drive continuous motion ourselves via a
+      // repeat interval that starts on "begin" and stops on "end".
+      switch (event.eventType) {
+        case 'up':
+          moveCursor('up');
+          return;
+        case 'down':
+          moveCursor('down');
+          return;
+        case 'left':
+          moveCursor('left');
+          return;
+        case 'right':
+          moveCursor('right');
+          return;
+        case 'swipeUp':
+          moveCursor('up');
+          return;
+        case 'swipeDown':
+          moveCursor('down');
+          return;
+        case 'swipeLeft':
+          moveCursor('left');
+          return;
+        case 'swipeRight':
+          moveCursor('right');
+          return;
+        case 'longUp':
+          if (actionRaw === 0) startHold('up');
+          else stopHold();
+          return;
+        case 'longDown':
+          if (actionRaw === 0) startHold('down');
+          else stopHold();
+          return;
+        case 'longLeft':
+          if (actionRaw === 0) startHold('left');
+          else stopHold();
+          return;
+        case 'longRight':
+          if (actionRaw === 0) startHold('right');
+          else stopHold();
+          return;
+        case 'select':
+        case 'playPause':
+          clickAtCursor();
+          return;
+        case 'longSelect':
+          // Only fire once, on hold-start.
+          if (actionRaw === 0) clickAtCursor();
+          return;
+        default:
+          return;
+      }
     },
-    [interactionMode, revealChrome],
+    [
+      interactionMode,
+      moveCursor,
+      clickAtCursor,
+      revealChrome,
+      startHold,
+      stopHold,
+    ],
   );
   useRemoteEventHandler(handleTVEvent);
 
@@ -182,7 +454,24 @@ export default function WatchScreen() {
   }, [chromeVisible, interactionMode, revealChrome]);
 
   useEffect(() => {
-    if (interactionMode) webViewRef.current?.requestFocus();
+    if (interactionMode) {
+      // Center the cursor when entering pointer mode. Instant (no animation)
+      // so it does not slide in from a stale position.
+      setCursorPos(
+        Math.round((playerSize.width || 0) / 2),
+        Math.round((playerSize.height || 0) / 2),
+        false,
+      );
+      // Reset acceleration counters.
+      (['up', 'down', 'left', 'right'] as const).forEach((d) => {
+        repeatInfo.current[d] = { count: 0, last: 0 };
+      });
+      setCursorHint('');
+      // Nudge the player into showing its control bar immediately.
+      hoverAtCursor(true);
+    }
+    // Intentionally only runs when interactionMode flips on.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [interactionMode]);
 
   useEffect(() => {
@@ -267,6 +556,7 @@ export default function WatchScreen() {
   };
 
   const handlePlayerError = (url: string) => {
+    if (!isMountedRef.current) return;
     if (!url || attemptedSources.current.has(url)) return;
     attemptedSources.current.add(url);
     const nextIndex = streams.findIndex(
@@ -417,7 +707,7 @@ export default function WatchScreen() {
             ) : null}
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Interact with the embedded page using the remote"
+              accessibilityLabel="Enter pointer mode to move a cursor over the embedded page with the D-pad"
               disabled={!sourceUrl}
               onPress={() => setInteractionMode(true)}
               style={({ focused }) => [
@@ -426,41 +716,148 @@ export default function WatchScreen() {
                 !sourceUrl && styles.disabled,
               ]}
             >
-              <Text style={styles.buttonText}>Interact</Text>
+              <Text style={styles.buttonText}>Pointer</Text>
             </Pressable>
           </View>
           {saveError ? <Text style={styles.saveError}>{saveError}</Text> : null}
         </>
       ) : null}
       {sourceUrl ? (
-        <View style={styles.playerContainer}>
+        <View
+          style={styles.playerContainer}
+          onLayout={(e: LayoutChangeEvent) => {
+            const { width, height } = e.nativeEvent.layout;
+            setPlayerSize({ width, height });
+            // Clamp / recenter cursor to the new bounds.
+            const curX = cursorPos.current.x;
+            const curY = cursorPos.current.y;
+            if (curX === 0 && curY === 0) {
+              setCursorPos(Math.round(width / 2), Math.round(height / 2), false);
+            } else {
+              setCursorPos(curX, curY, false);
+            }
+          }}
+        >
           <WebView<unknown>
             ref={webViewRef}
             key={`${sourceUrl}:${reloadToken}`}
             source={{ uri: sourceUrl }}
             style={styles.player}
-            focusable
-            hasTVPreferredFocus={Platform.isTV && interactionMode}
+            // Keep the native WebView out of the TV focus graph so the native
+            // video player never captures the D-pad. In pointer mode we drive
+            // the cursor from JS and dispatch synthetic clicks via
+            // injectJavaScript.
+            focusable={false}
             originWhitelist={['http://*', 'https://*']}
             javaScriptEnabled
             domStorageEnabled
             allowsFullscreenVideo
             mediaPlaybackRequiresUserAction={false}
-            onLoadStart={() => setLoading(true)}
-            onLoad={() => setLoading(false)}
-            onLoadEnd={() => {
-              setLoading(false);
-              if (interactionMode) webViewRef.current?.requestFocus();
+            onLoadStart={() => {
+              if (isMountedRef.current) setLoading(true);
             }}
-            onError={() => handlePlayerError(sourceUrl)}
+            onLoad={() => {
+              if (isMountedRef.current) setLoading(false);
+            }}
+            onLoadEnd={() => {
+              if (isMountedRef.current) setLoading(false);
+            }}
+            onMessage={(event) => {
+              if (!isMountedRef.current) return;
+              try {
+                const data = JSON.parse(event.nativeEvent.data);
+                if (data && data.type === 'cursor-click') {
+                  if (data.inIframe) {
+                    setCursorHint(
+                      'This control lives inside a cross-origin frame; the tap may not register. Try another mirror if it does not respond.',
+                    );
+                  } else if (data.tag && data.tag !== 'none') {
+                    setCursorHint(`Tapped <${data.tag}>`);
+                  }
+                }
+              } catch {
+                /* ignore */
+              }
+            }}
+            onError={() => {
+              if (isMountedRef.current) handlePlayerError(sourceUrl);
+            }}
           />
           {interactionMode ? (
-            <View pointerEvents="none" style={styles.interactionNotice}>
-              <Text style={styles.interactionNoticeTitle}>PAGE INTERACTION</Text>
-              <Text style={styles.interactionNoticeText}>
-                Use the D-pad and Select to navigate the page. Press Back to resume playback.
-              </Text>
-            </View>
+            <>
+              {/*
+                Pointer-mode input layer.
+
+                - The Pressable covers the whole player and holds TV focus.
+                  Because it's focused, Android TV routes D-pad events to its
+                  own key dispatcher first (where RN forwards them to
+                  useTVEventHandler) instead of to the native video view
+                  underneath. That stops the player from grabbing left/right
+                  for seek and up/down for volume.
+
+                - nextFocus* set to the overlay's own node tag traps focus so
+                  the focus-finder can't wander onto the WebView if a key
+                  isn't otherwise consumed. We also wrap in TVFocusGuideView
+                  with trapFocus* as belt-and-braces.
+
+                - onPress is bound to clickAtCursor so the Select key always
+                  fires a synthetic click at the cursor position; this is
+                  also what prevents Select from being treated as a focus
+                  escape by the TV focus engine.
+              */}
+              <TVFocusGuideView
+                trapFocusUp
+                trapFocusDown
+                trapFocusLeft
+                trapFocusRight
+                style={styles.pointerInputOverlay}
+              >
+                <Pressable
+                  ref={(instance) => {
+                    overlayRef.current = instance as unknown as View | null;
+                    const tag = instance
+                      ? findNodeHandle(instance as unknown as View)
+                      : null;
+                    if (tag !== overlayTag) setOverlayTag(tag);
+                  }}
+                  accessibilityLabel="Pointer mode input surface"
+                  hasTVPreferredFocus
+                  focusable
+                  collapsable={false}
+                  onPress={clickAtCursor}
+                  nextFocusUp={overlayTag ?? undefined}
+                  nextFocusDown={overlayTag ?? undefined}
+                  nextFocusLeft={overlayTag ?? undefined}
+                  nextFocusRight={overlayTag ?? undefined}
+                  nextFocusForward={overlayTag ?? undefined}
+                  style={styles.pointerInputOverlay}
+                />
+              </TVFocusGuideView>
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.cursorLayer,
+                  {
+                    transform: [
+                      { translateX: cursorX },
+                      { translateY: cursorY },
+                    ],
+                  },
+                ]}
+              >
+                <View style={styles.cursorRing} />
+                <View style={styles.cursorDot} />
+              </Animated.View>
+              <View pointerEvents="none" style={styles.interactionNotice}>
+                <Text style={styles.interactionNoticeTitle}>POINTER MODE</Text>
+                <Text style={styles.interactionNoticeText}>
+                  D-pad moves the cursor. Select/Play taps. Back exits.
+                </Text>
+                {cursorHint ? (
+                  <Text style={styles.interactionNoticeHint}>{cursorHint}</Text>
+                ) : null}
+              </View>
+            </>
           ) : null}
           {loading ? (
             <View style={styles.loading}>
@@ -654,6 +1051,54 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   interactionNoticeText: { color: palette.text, fontSize: 13, lineHeight: 18 },
+  interactionNoticeHint: {
+    color: palette.mint,
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 4,
+  },
+  pointerInputOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'transparent',
+  },
+  // Zero-size positioned origin. Dot and ring are centered via negative
+  // margins so the Animated translate drives the cursor's *center* to
+  // (cursorX, cursorY).
+  cursorLayer: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    width: 0,
+    height: 0,
+  },
+  cursorDot: {
+    position: 'absolute',
+    left: -CURSOR_SIZE / 2,
+    top: -CURSOR_SIZE / 2,
+    width: CURSOR_SIZE,
+    height: CURSOR_SIZE,
+    borderRadius: CURSOR_SIZE / 2,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#101010',
+    // Tiny glow so the cursor reads on bright video frames.
+    shadowColor: '#000',
+    shadowOpacity: 0.6,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 6,
+  },
+  cursorRing: {
+    position: 'absolute',
+    left: -CURSOR_RING / 2,
+    top: -CURSOR_RING / 2,
+    width: CURSOR_RING,
+    height: CURSOR_RING,
+    borderRadius: CURSOR_RING / 2,
+    borderWidth: 2,
+    borderColor: 'rgba(103,232,249,0.95)',
+    backgroundColor: 'rgba(103,232,249,0.14)',
+  },
   loading: {
     ...StyleSheet.absoluteFill,
     alignItems: 'center',

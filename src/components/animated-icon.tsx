@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { View } from 'react-native';
-import Animated, { Keyframe, Easing } from 'react-native-reanimated';
+import Animated, { Easing, Keyframe } from 'react-native-reanimated';
 
 import classes from '@/components/animated-icon.module.css';
 import { useAnimatedIconStyles } from '@/hooks/use-animated-styles';

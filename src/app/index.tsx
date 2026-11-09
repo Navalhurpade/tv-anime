@@ -1,24 +1,23 @@
-import { useFocusEffect } from 'expo-router';
-import { Href, router } from 'expo-router';
-import React, { useCallback, useMemo, useState } from 'react';
+import { Href, router, useFocusEffect } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
   Anime,
   clearLastWatched,
-  getEpisodeStreamUrls,
-  getEpisodes,
-  getLastWatched,
   getAnimeSlug,
+  getEpisodes,
+  getEpisodeStreamUrls,
   getHome,
+  getLastWatched,
   HomeCollection,
   LastWatched,
   StreamLanguage,
   unwrapFeatured,
 } from '@/api/anime';
 import {
-  animeDetailsHref,
   ActionButton,
+  animeDetailsHref,
   AnimeRail,
   ErrorState,
   Hero,
@@ -145,6 +144,13 @@ export default function HomeScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.content}
+          // Snap each flick to a rail-height so pressing Down once lands
+          // cleanly on the next rail instead of a half-scrolled position.
+          // The focus engine still does its own scroll-into-view; snap only
+          // affects where it finally rests.
+          snapToInterval={404}
+          snapToAlignment="start"
+          decelerationRate="fast"
         >
           {heroAnime ? <FeaturedHero anime={heroAnime} /> : null}
           {resumeError ? <Text style={styles.resumeError}>{resumeError}</Text> : null}
@@ -279,7 +285,10 @@ function FeaturedHero({ anime }: { anime: Anime }) {
 }
 
 const styles = StyleSheet.create({
-  content: { paddingBottom: 52 },
+  // Big bottom pad so the last rail's focused (1.08× scaled) card and its
+  // glow shadow always have room — otherwise the focus engine scrolls the
+  // card into view but the shadow/ring gets clipped by the screen edge.
+  content: { paddingBottom: 120 },
   continueSection: { marginHorizontal: 48, marginTop: 26, marginBottom: 6 },
   continueHeading: {
     alignItems: 'center',
