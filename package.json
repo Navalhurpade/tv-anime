@@ -10,7 +10,7 @@
     "reset-project": "node ./scripts/reset-project.js",
     "lint": "expo lint",
     "prebuild": "expo prebuild --clean",
-    "prebuild:tv": "EXPO_TV=1 expo prebuild --clean",
+    "prebuild:tv": "node ./scripts/prebuild-tv.js",
     "build:apk": "npx eas-cli@latest build --platform android --profile preview_tv",
     "deploy": "npx expo export -p web && npx eas-cli@latest deploy"
   },

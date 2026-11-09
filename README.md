@@ -65,7 +65,7 @@ The application code is based on the [revamped default project template](https:/
 
 ```sh
 yarn
-yarn prebuild:tv # Executes clean Expo prebuild with TV modifications
+npm run prebuild:tv # Executes clean Expo prebuild with TV modifications (Windows/macOS/Linux)
 yarn ios # Build and run for Apple TV
 yarn android # Build for Android TV
 ```
@@ -85,8 +85,8 @@ yarn web # Run the project on web from localhost
 ```
 
 > **_NOTE:_**
-> Setting the environment variable `EXPO_TV=1` enables the `@react-native-tvos/config-tv` plugin to modify the project for TV.
-> This can also be done by setting the parameter `isTV` to true in the `app.json`.
+> The `prebuild:tv` script sets `EXPO_TV=1` for the prebuild command, including on Windows.
+> The Android TV banner and icon are configured in `app.json`.
 
 ## Development
 
