@@ -342,3 +342,101 @@ GET - https://animehot.cc/api/episodes/6ac121ed084af4f873a70b4f?start=1&end=6
         }
     ]
 }
+
+6. 
+https://animehot.cc/api/filter
+Request method
+POST - payload - ```{
+    "page": 1,
+    "limit": 20,
+    "keyword": "dr stone",
+    "type": "TV",
+    "status": "Airing",
+    "rated": "G - All Ages",
+    "score": "9",
+    "language": "English",
+    "startDate": "2026-11-01",
+    "endDate": "2026-11-30"
+}```
+response -> 
+```{
+    "total": 0,
+    "page": 1,
+    "limit": 20,
+    "totalPages": 0,
+    "results": [
+        {
+    "_id": "6a9455a4cf53bfc7bda86009",
+    "title": "Naruto Spin-Off: Rock Lee & His Ninja Pals",
+    "mal_id": 12979,
+    "alternateTitle": "Naruto Spin-Off: Rock Lee & His Ninja Pals",
+    "image": "https://animehot.cc/storage/media/2026/09/6a9455a4cf53bfc7bda86009-poster.jpg",
+    "landScapeImage": "https://animehot.cc/storage/media/2026/09/6a9455a4cf53bfc7bda86009-landscape.webp",
+    "synopsis": "The competitive shinobi world has proven to be challenging for Rock Lee, who lacks the typically required abilities. To compensate for this handicap, the young ninja tenaciously endures severe training to hone his hand-to-hand combat skills. Whenever necessary, he also resorts to creative fighting techniques. With the constant support of his teammates Neji Hyuuga and Tenten, Lee readily embraces daring adventures as opportunities to advance on his path toward excellence.\n\n[Written by MAL Rewrite]",
+    "score": "PG-13 - Teens 13 or older",
+    "genres": [
+        "Action",
+        "Comedy"
+    ],
+    "Japanese": "ナルトSD ロック・リーの青春フルパワー忍伝",
+    "English": "Naruto Spin-Off: Rock Lee & His Ninja Pals",
+    "characters": [],
+    "Type": "TV",
+    "totalEpisodes": "51",
+    "Status": "Finished Airing",
+    "Aired": "Apr 3, 2012 to Mar 26, 2013",
+    "Premiered": "",
+    "Broadcast": "Tuesdays at 18:00 (JST)",
+    "Producers": "TV Tokyo, Shueisha",
+    "Licensors": "VIZ Media",
+    "Source": "Manga",
+    "Duration": "24 min per ep",
+    "Rating": "PG-13 - Teens 13 or older",
+    "Score": "7.18",
+    "Ranked": "3843",
+    "Popularity": "2284",
+    "Members": "108208",
+    "Favorites": "318",
+    "comments": [],
+    "slugs": [
+        "naruto-spin-off:-rock-lee-and-his-ninja-pals-lw272u"
+    ],
+    "totalSubbed": 51,
+    "totalDubbed": 51,
+    "createdAt": "2026-08-30T16:09:08.864Z",
+    "imageMigrationAttempts": 1,
+    "imageMigrationError": "",
+    "imageMigrationStatus": "completed",
+    "imageStorageKey": "media/2026/09/6a9455a4cf53bfc7bda86009-poster.jpg",
+    "imagesMigratedAt": "2026-09-29T19:22:33.654Z",
+    "landScapeImageStorageKey": "media/2026/09/6a9455a4cf53bfc7bda86009-landscape.webp",
+    "originalImage": "https://cdn.myanimelist.net/images/anime/13/36475l.jpg",
+    "originalLandScapeImage": "https://cdn.myanimelist.net/images/anime/13/36475l.webp",
+    "slug": "naruto-spin-off:-rock-lee-and-his-ninja-pals-lw272u",
+    "episodes": [
+        {
+            "_id": "6a9455f196ab6f12002ecb47",
+            "anime_id": "6a9455a4cf53bfc7bda86009",
+            "episodeNumber": 1,
+            "title": "Episode 1",
+            "link": {
+                "sub": [
+                    "https://zokoanime.video/stream/mal/12979/1/sub?color=35d5bf",
+                    "https://megaplay.buzz/stream/mal/12979/1/sub"
+                ],
+                "dub": [
+                    "https://zokoanime.video/stream/mal/12979/1/dub?color=35d5bf",
+                    "https://megaplay.buzz/stream/mal/12979/1/dub"
+                ]
+            },
+            "slugs": [
+                "naruto-spin-off-rock-lee-and-his-ninja-pals-episode-1-3293yl"
+            ],
+            "createdAt": "2026-08-30T16:10:25.202Z",
+            "slug": "naruto-spin-off-rock-lee-and-his-ninja-pals-episode-1-3293yl"
+        }
+    ],
+    "seasons": []
+}
+    ]
+}```
